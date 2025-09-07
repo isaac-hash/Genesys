@@ -9,9 +9,11 @@ def cli():
     """Genesys CLI for ROS 2 workspace management."""
     pass
 
-def _get_sourcing_command(exit_on_error=True):
+def _get_sourcing_command(exit_on_error=True, clean_env=False):
     """
     Returns the platform-specific command to source the ROS 2 and local workspace environments.
+
+    :param clean_env: If True, unsets common ROS environment variables for a clean build.
     """
     ros_distro = os.environ.get('ROS_DISTRO')
     if not ros_distro:
@@ -34,7 +36,12 @@ def _get_sourcing_command(exit_on_error=True):
             return None, None
             
         # Chain the sourcing commands
-        command_parts = [f"source {distro_setup_script}"]
+        command_parts = []
+        if clean_env:
+            # These are the most common variables that cause cross-workspace contamination.
+            command_parts.extend(["unset AMENT_PREFIX_PATH", "unset COLCON_PREFIX_PATH"])
+
+        command_parts.append(f"source {distro_setup_script}")
         if os.path.exists(ws_setup_script):
             command_parts.append(f"source {ws_setup_script}")
             
@@ -134,7 +141,7 @@ def build():
 
     click.echo("Building the workspace...")
 
-    source_prefix, shell_exec = _get_sourcing_command()
+    source_prefix, shell_exec = _get_sourcing_command(clean_env=True)
     colcon_command = ['colcon', 'build', '--symlink-install']
     command_to_run = source_prefix + ' '.join(colcon_command)
 
