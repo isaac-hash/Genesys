@@ -210,7 +210,7 @@ def make_pkg(package_name, with_node):
         command.extend(['--node-name', node_name])
         click.echo(f"Adding initial node: {node_name}")
 
-    source_prefix, shell_exec = _get_sourcing_command()
+    source_prefix, shell_exec = _get_sourcing_command(clean_env=True)
     command_to_run = source_prefix + ' '.join(command)
 
     try:
