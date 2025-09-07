@@ -367,6 +367,38 @@ def generate_launch_description():
             f.write(boilerplate)
         click.secho(f"✓ Auto-generated launch file: {launch_file}", fg="green")
 
+def _add_node_to_launch(pkg_name, node_name):
+    """Adds a new Node entry into the package's launch file if it exists."""
+    launch_file = os.path.join('src', pkg_name, 'launch', f"{pkg_name}_launch.py")
+    if not os.path.exists(launch_file):
+        return  # no launch file yet (handled in _add_launch_file_boilerplate)
+
+    with open(launch_file, 'r') as f:
+        content = f.read()
+
+    # Build the new Node block
+    new_node_block = f"""        Node(
+            package='{pkg_name}',
+            executable='{node_name}',
+            name='{node_name}',
+            output='screen',
+            emulate_tty=True
+        ),"""
+
+    if new_node_block in content:
+        click.secho(f"Launch file already contains '{node_name}'.", fg="yellow")
+        return
+
+    # Insert before the closing ])
+    if "])" in content:
+        content = content.replace("])", new_node_block + "\n    ])")
+
+    with open(launch_file, 'w') as f:
+        f.write(content)
+
+    click.secho(f"✓ Added '{node_name}' to launch file: {launch_file}", fg="green")
+
+
 @cli.command(name='make:node')
 @click.argument('node_name')
 @click.option('--pkg', 'pkg_name', required=True, help='The name of the package to add the node to.')
@@ -406,6 +438,7 @@ if __name__ == '__main__':
         _add_python_entry_point(pkg_name, node_name)
         _add_launch_file_boilerplate(pkg_name, node_name) 
         _add_install_rule_for_launch_dir(pkg_name)
+        _add_node_to_launch(pkg_name, node_name)
         # Call the new function
     elif os.path.exists(os.path.join(pkg_path, 'CMakeLists.txt')):
         # C++ package
