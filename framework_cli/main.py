@@ -226,6 +226,52 @@ def _add_python_entry_point(pkg_name, node_name):
     
     click.secho(f"✓ Registered '{node_name}' in {setup_file}", fg="green")
 
+def _add_install_rule_for_launch_dir(pkg_name):
+    """Adds the install rule for the launch directory to setup.py."""
+    setup_file = os.path.join('src', pkg_name, 'setup.py')
+    if not os.path.exists(setup_file):
+        return  # Not a python package
+
+    with open(setup_file, 'r') as f:
+        content = f.read()
+
+    # Check if the rule already exists to avoid duplicates
+    if "glob(os.path.join('launch'" in content:
+        return
+
+    # Add necessary imports if they are missing
+    imports_to_add = []
+    if 'import os' not in content:
+        imports_to_add.append('import os')
+    if 'from glob import glob' not in content:
+        imports_to_add.append('from glob import glob')
+    
+    if imports_to_add:
+        content = "\n".join(imports_to_add) + "\n" + content
+
+    # Find the line installing package.xml to insert our rule after it
+    package_xml_line = "('share/' + package_name, ['package.xml'])"
+    match = re.search(re.escape(package_xml_line), content)
+    if not match:
+        click.secho(f"Warning: Could not find package.xml install rule in {setup_file}. Cannot add launch install rule.", fg="yellow")
+        return
+    
+    # Determine the indentation from the found line
+    line_start = content.rfind('\n', 0, match.start()) + 1
+    indentation = " " * (match.start() - line_start)
+
+    # Note the comma at the beginning to correctly extend the list
+    new_rule = f",\n{indentation}(os.path.join('share', package_name, 'launch'), glob(os.path.join('launch', '*launch.py')))"
+    
+    # Insert the new rule right after the package.xml line
+    insertion_point = match.end()
+    updated_content = content[:insertion_point] + new_rule + content[insertion_point:]
+
+    with open(setup_file, 'w') as f:
+        f.write(updated_content)
+    
+    click.secho(f"✓ Added launch directory install rule to {setup_file}", fg="green")
+
 def _add_cpp_executable(pkg_name, node_name):
     """Adds a new executable and install rule to a package's CMakeLists.txt."""
     cmake_file = os.path.join('src', pkg_name, 'CMakeLists.txt')
@@ -261,6 +307,39 @@ install(TARGETS
         f.write(updated_content)
     
     click.secho(f"✓ Registered '{node_name}' in {cmake_file}", fg="green")
+
+def _add_install_rule_for_launch_dir_cpp(pkg_name):
+    """Adds the install rule for the launch directory to CMakeLists.txt."""
+    cmake_file = os.path.join('src', pkg_name, 'CMakeLists.txt')
+    if not os.path.exists(cmake_file):
+        return # Not a C++ package
+
+    with open(cmake_file, 'r') as f:
+        content = f.read()
+
+    # Check if the rule already exists
+    if 'install(DIRECTORY launch' in content:
+        return
+
+    # Find the ament_package() call to insert before it
+    ament_package_call = re.search(r"ament_package\(\)", content)
+    if not ament_package_call:
+        click.secho(f"Warning: Could not find ament_package() call in {cmake_file}. Cannot add launch install rule.", fg="yellow")
+        return
+
+    insert_pos = ament_package_call.start()
+    new_cmake_commands = f"""install(
+  DIRECTORY launch
+  DESTINATION share/${{PROJECT_NAME}}
+)
+
+"""
+    updated_content = content[:insert_pos] + new_cmake_commands + content[insert_pos:]
+
+    with open(cmake_file, 'w') as f:
+        f.write(updated_content)
+    
+    click.secho(f"✓ Added launch directory install rule to {cmake_file}", fg="green")
 
 def _add_launch_file_boilerplate(pkg_name, node_name):
     """Auto-generates a boilerplate launch file for a new node."""
@@ -346,6 +425,7 @@ int main(int argc, char **argv) {{
             f.write(boilerplate)
         click.secho(f"✓ Created C++ node file: {node_file}", fg="green")
         _add_cpp_executable(pkg_name, node_name)
+        _add_install_rule_for_launch_dir_cpp(pkg_name)
     else:
         click.secho(f"Error: Could not determine package type for '{pkg_name}'. No setup.py or CMakeLists.txt found.", fg="red")
         sys.exit(1)
