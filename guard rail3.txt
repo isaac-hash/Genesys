@@ -1,0 +1,11 @@
+{
+  "pain_point": "Launching all packages at once can lead to unpredictable behavior (duplicate nodes, multiple Gazebo/RViz instances, debug/demo nodes starting unintentionally).",
+  "concept": "Provide a safe and predictable convention for multi-package launch.",
+  "details": {
+    "issue": "Blindly aggregating every launch file in the workspace (`src/*/launch/*.py`) is unsafe and noisy.",
+    "solution": "Require each package to optionally define a `launch/default.launch.py`. The `framework launch --all` command only includes these default files. Genesys scaffolds a default.launch.py automatically when creating a package.",
+    "benefit": "Ensures consistency, prevents accidental over-launching, and provides a clear convention for developers. Keeps Genesys ergonomic but predictable."
+  },
+  "priority": "high",
+  "status": "MVP"
+}
