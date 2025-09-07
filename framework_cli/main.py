@@ -681,7 +681,7 @@ def sim(world_file):
         "def generate_launch_description():",
         "    pkg_gazebo_ros = get_package_share_directory('gazebo_ros')",
         f"    world_path = '{world_path_abs}'",
-        "    gzserver_cmd = IncludeLaunchDescription(PythonLaunchDescriptionSource(os.path.join(pkg_gazebo_ros, 'launch', 'gzserver.launch.py')), launch_arguments={{'world': world_path, 'verbose': 'true'}}.items())",
+        "    gzserver_cmd = IncludeLaunchDescription(PythonLaunchDescriptionSource(os.path.join(pkg_gazebo_ros, 'launch', 'gzserver.launch.py')), launch_arguments={'world': world_path, 'verbose': 'true'}.items())",
         "    gzclient_cmd = IncludeLaunchDescription(PythonLaunchDescriptionSource(os.path.join(pkg_gazebo_ros, 'launch', 'gzclient.launch.py')))",
         "    ld = LaunchDescription([gzserver_cmd, gzclient_cmd])",
     ]
@@ -691,7 +691,7 @@ def sim(world_file):
         launch_content_parts.extend([
             f"    with open('{robot_model_path_abs}', 'r') as infp:",
             "        robot_desc = infp.read()",
-            "    robot_state_publisher_node = Node(package='robot_state_publisher', executable='robot_state_publisher', output='screen', parameters=[{{'robot_description': robot_desc, 'use_sim_time': True}}])",
+            "    robot_state_publisher_node = Node(package='robot_state_publisher', executable='robot_state_publisher', output='screen', parameters=[{'robot_description': robot_desc, 'use_sim_time': True}])",
             f"    spawn_entity_node = Node(package='gazebo_ros', executable='spawn_entity.py', arguments=['-entity', '{robot_name}', '-topic', 'robot_description'], output='screen')",
             "    ld.add_action(robot_state_publisher_node)",
             "    ld.add_action(spawn_entity_node)",
