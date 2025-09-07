@@ -703,7 +703,7 @@ def sim(world_file):
     temp_launch_file = None
     process = None
     try:
-        with tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='_sim_launch.py', dir='.') as f:
+        with tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='_sim_launch.py') as f:
             temp_launch_file = f.name
             f.write(launch_content)
         source_prefix, shell_exec = _get_sourcing_command(clean_env=True)
