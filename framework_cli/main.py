@@ -231,5 +231,68 @@ def make_pkg(package_name, with_node):
         click.echo(e.stderr or e.stdout)
         sys.exit(1)
 
+@cli.command()
+@click.argument('node_name')
+def run(node_name):
+    """Runs a ROS 2 node by its executable name, automatically finding the package."""
+    # 1. Verify we are in a workspace that has been built.
+    if not os.path.isdir('install'):
+        click.secho("Error: 'install' directory not found. Have you built the workspace yet?", fg="red")
+        click.secho("Try running 'framework build' first.", fg="yellow")
+        sys.exit(1)
+
+    click.echo(f"Attempting to run node: {node_name}")
+
+    # 2. Get the sourcing command, which now includes the local install space.
+    source_prefix, shell_exec = _get_sourcing_command()
+    
+    # 3. Find the package for the given node by listing all executables.
+    list_exec_command = source_prefix + "ros2 pkg executables"
+    try:
+        result = subprocess.run(
+            list_exec_command,
+            check=True, capture_output=True, text=True, shell=True, executable=shell_exec
+        )
+    except subprocess.CalledProcessError as e:
+        click.secho("Error: Failed to list ROS 2 executables.", fg="red")
+        click.echo(e.stderr or e.stdout)
+        sys.exit(1)
+
+    # 4. Parse the output to find the package name.
+    package_name = None
+    available_nodes = []
+    for line in result.stdout.strip().split('\n'):
+        if ':' not in line:
+            continue
+        pkg, nodes_str = line.split(':', 1)
+        nodes = nodes_str.strip().split()
+        available_nodes.extend(nodes)
+        if node_name in nodes:
+            package_name = pkg.strip()
+            break
+    
+    if not package_name:
+        click.secho(f"Error: Node '{node_name}' not found in any package.", fg="red")
+        click.echo("Please ensure you have built your workspace and the node name is correct.")
+        if available_nodes:
+            click.echo("\nAvailable nodes are:")
+            for node in sorted(available_nodes):
+                click.echo(f"  - {node}")
+        sys.exit(1)
+
+    click.echo(f"Found node '{node_name}' in package '{package_name}'. Starting node...")
+
+    # 5. Construct and run the final command.
+    run_command = f"ros2 run {package_name} {node_name}"
+    command_to_run = source_prefix + run_command
+
+    try:
+        # Use Popen to stream output and allow user to Ctrl+C the node.
+        process = subprocess.Popen(command_to_run, shell=True, executable=shell_exec)
+        process.wait()
+    except KeyboardInterrupt:
+        click.echo("\nNode execution interrupted by user.")
+        process.terminate()
+
 if __name__ == '__main__':
     cli()
