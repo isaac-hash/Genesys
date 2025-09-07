@@ -173,8 +173,8 @@ def build():
 @click.option('--with-node', is_flag=True, help='Create an initial node for the package.')
 def make_pkg(package_name, with_node):
     """Creates a new ROS 2 package inside the src/ directory."""
-    
-    # First, verify we are in a Genesys workspace root.
+
+    # Verify workspace root
     if not os.path.isdir('src'):
         click.secho("Error: This command must be run from the root of a Genesys workspace.", fg="red")
         click.secho("(A 'src' directory was not found.)", fg="yellow")
@@ -182,11 +182,12 @@ def make_pkg(package_name, with_node):
 
     click.echo(f"Creating new ROS 2 package: {package_name}")
 
-    # Default to ament_python. This can be overridden by the interactive prompt.
+    # Default build type
     build_type = 'ament_python'
+    language = None
+    node_name = None
 
     if with_node:
-        # Per guard rails, prompt for language when creating a node.
         language = click.prompt(
             'Choose a language for the new node',
             type=click.Choice(['python', 'cpp'], case_sensitive=False),
@@ -197,6 +198,7 @@ def make_pkg(package_name, with_node):
             build_type = 'ament_cmake'
         click.echo(f"Using build type: {build_type}")
 
+    # Run ros2 pkg create
     command = [
         'ros2', 'pkg', 'create',
         '--build-type', build_type,
@@ -205,7 +207,6 @@ def make_pkg(package_name, with_node):
     ]
 
     if with_node:
-        # Per the guard rails, create a default node. A good convention is <pkg_name>_node.
         node_name = f"{package_name}_node"
         command.extend(['--node-name', node_name])
         click.echo(f"Adding initial node: {node_name}")
@@ -214,8 +215,6 @@ def make_pkg(package_name, with_node):
     command_to_run = source_prefix + ' '.join(command)
 
     try:
-        # Run the command from the workspace root.
-        # Use shell=True to allow the 'source' command to work.
         subprocess.run(
             command_to_run,
             check=True,
@@ -225,11 +224,64 @@ def make_pkg(package_name, with_node):
             executable=shell_exec
         )
         click.secho(f"✓ Package '{package_name}' created successfully in 'src/'.", fg="green")
-
     except subprocess.CalledProcessError as e:
         click.secho(f"Error creating package '{package_name}':", fg="red")
         click.echo(e.stderr or e.stdout)
         sys.exit(1)
+
+    # --- Extra: Auto-generate Python node + update setup.py ---
+    if with_node and language == 'python':
+        pkg_dir = os.path.join('src', package_name, package_name)
+        os.makedirs(pkg_dir, exist_ok=True)
+
+        node_file = os.path.join(pkg_dir, f"{node_name}.py")
+        if not os.path.exists(node_file):
+            with open(node_file, 'w') as f:
+                f.write(f"""import rclpy
+from rclpy.node import Node
+
+
+class {package_name.capitalize()}Node(Node):
+    def __init__(self):
+        super().__init__("{package_name}_node")
+        self.get_logger().info("Node '{node_name}' has started!")
+
+
+def main(args=None):
+    rclpy.init(args=args)
+    node = {package_name.capitalize()}Node()
+    rclpy.spin(node)
+    node.destroy_node()
+    rclpy.shutdown()
+
+
+if __name__ == "__main__":
+    main()
+""")
+            click.secho(f"✓ Default Python node created: {node_file}", fg="green")
+
+        # Update setup.py to add console_scripts entry
+        setup_file = os.path.join('src', package_name, 'setup.py')
+        if os.path.exists(setup_file):
+            with open(setup_file, 'r') as f:
+                setup_contents = f.read()
+
+            # Inject entry point only if not already present
+            if 'console_scripts' not in setup_contents:
+                insert_point = setup_contents.rfind("setup(")
+                new_entry = f"""
+    entry_points={{
+        'console_scripts': [
+            '{node_name} = {package_name}.{node_name}:main'
+        ],
+    }},
+"""
+                setup_contents = setup_contents.replace("setup(", "setup(\n" + new_entry, 1)
+
+                with open(setup_file, 'w') as f:
+                    f.write(setup_contents)
+
+                click.secho(f"✓ setup.py updated with console script for {node_name}", fg="green")
 
 @cli.command()
 @click.argument('node_name')
