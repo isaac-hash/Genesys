@@ -626,5 +626,103 @@ def run(node_name):
         click.echo("\nNode execution interrupted by user.")
         process.terminate()
 
+@cli.command()
+@click.argument('world_file')
+def sim(world_file):
+    """Launches a simulation with a specified world file and robot model."""
+    # 1. Verify workspace state
+    if not os.path.isdir('install'):
+        click.secho("Error: 'install' directory not found. Have you built the workspace yet?", fg="red")
+        click.secho("Try running 'framework build' first.", fg="yellow")
+        sys.exit(1)
+
+    sim_worlds_dir = 'sim/worlds'
+    if not os.path.isdir(sim_worlds_dir):
+        click.secho(f"Error: Simulation worlds directory not found at './{sim_worlds_dir}'", fg="red")
+        click.secho("Ensure your project was created with 'framework new'.", fg="yellow")
+        sys.exit(1)
+
+    world_path = os.path.join(sim_worlds_dir, world_file)
+    if not os.path.exists(world_path):
+        click.secho(f"Error: World file not found: {world_path}", fg="red")
+        sys.exit(1)
+
+    # 2. Find robot model in sim/models
+    sim_models_dir = 'sim/models'
+    robot_model_path = None
+    if os.path.isdir(sim_models_dir):
+        for file in os.listdir(sim_models_dir):
+            if file.endswith(('.urdf', '.sdf')):
+                robot_model_path = os.path.join(sim_models_dir, file)
+                click.echo(f"Found robot model: {robot_model_path}")
+                break
+
+    if not robot_model_path:
+        click.secho("Warning: No robot model (.urdf or .sdf) found in 'sim/models/'.", fg="yellow")
+        click.secho("Gazebo will be launched without a robot.", fg="yellow")
+
+    # 3. Generate temporary launch file
+    import tempfile
+    workspace_root_abs = os.getcwd()
+    world_path_abs = os.path.join(workspace_root_abs, world_path)
+
+    robot_model_path_abs = None
+    if robot_model_path:
+        robot_model_path_abs = os.path.join(workspace_root_abs, robot_model_path)
+
+    launch_content_parts = [
+        "import os",
+        "from ament_index_python.packages import get_package_share_directory",
+        "from launch import LaunchDescription",
+        "from launch.actions import IncludeLaunchDescription",
+        "from launch.launch_description_sources import PythonLaunchDescriptionSource",
+        "from launch_ros.actions import Node",
+        "",
+        "def generate_launch_description():",
+        "    pkg_gazebo_ros = get_package_share_directory('gazebo_ros')",
+        f"    world_path = '{world_path_abs}'",
+        "    gzserver_cmd = IncludeLaunchDescription(PythonLaunchDescriptionSource(os.path.join(pkg_gazebo_ros, 'launch', 'gzserver.launch.py')), launch_arguments={{'world': world_path, 'verbose': 'true'}}.items())",
+        "    gzclient_cmd = IncludeLaunchDescription(PythonLaunchDescriptionSource(os.path.join(pkg_gazebo_ros, 'launch', 'gzclient.launch.py')))",
+        "    ld = LaunchDescription([gzserver_cmd, gzclient_cmd])",
+    ]
+
+    if robot_model_path_abs:
+        robot_name = os.path.splitext(os.path.basename(robot_model_path_abs))[0]
+        launch_content_parts.extend([
+            f"    with open('{robot_model_path_abs}', 'r') as infp:",
+            "        robot_desc = infp.read()",
+            "    robot_state_publisher_node = Node(package='robot_state_publisher', executable='robot_state_publisher', output='screen', parameters=[{{'robot_description': robot_desc, 'use_sim_time': True}}])",
+            f"    spawn_entity_node = Node(package='gazebo_ros', executable='spawn_entity.py', arguments=['-entity', '{robot_name}', '-topic', 'robot_description'], output='screen')",
+            "    ld.add_action(robot_state_publisher_node)",
+            "    ld.add_action(spawn_entity_node)",
+        ])
+
+    launch_content_parts.append("    return ld")
+    launch_content = "\n".join(launch_content_parts)
+
+    temp_launch_file = None
+    process = None
+    try:
+        with tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='_sim_launch.py', dir='.') as f:
+            temp_launch_file = f.name
+            f.write(launch_content)
+        source_prefix, shell_exec = _get_sourcing_command(clean_env=True)
+        command_to_run = source_prefix + f"ros2 launch {temp_launch_file}"
+        click.echo(f"Executing: ros2 launch {os.path.basename(temp_launch_file)}")
+        process = subprocess.Popen(command_to_run, shell=True, executable=shell_exec)
+        click.secho("\n✓ Simulation is starting...", fg="cyan")
+        if robot_model_path:
+            click.echo("  Run your robot's control and logic nodes in a separate, sourced terminal (e.g., 'framework launch <pkg_name>').")
+        process.wait()
+    except KeyboardInterrupt:
+        click.echo("\nSimulation interrupted by user.")
+        if process and process.poll() is None:
+            process.terminate()
+    except Exception as e:
+        click.secho(f"An error occurred during simulation launch: {e}", fg="red")
+    finally:
+        if temp_launch_file and os.path.exists(temp_launch_file):
+            os.remove(temp_launch_file)
+
 if __name__ == '__main__':
     cli()
