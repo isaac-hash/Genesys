@@ -200,6 +200,7 @@ def make_pkg(package_name, with_node):
     command = [
         'ros2', 'pkg', 'create',
         '--build-type', build_type,
+        '--destination-directory', 'src',
         package_name
     ]
 
@@ -213,11 +214,10 @@ def make_pkg(package_name, with_node):
     command_to_run = source_prefix + ' '.join(command)
 
     try:
-        # We must run the command inside the 'src' directory.
+        # Run the command from the workspace root.
         # Use shell=True to allow the 'source' command to work.
         subprocess.run(
             command_to_run,
-            cwd='src',
             check=True,
             capture_output=True,
             text=True,
