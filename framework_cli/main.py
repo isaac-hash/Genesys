@@ -404,7 +404,9 @@ if __name__ == '__main__':
             f.write(boilerplate)
         click.secho(f"✓ Created Python node file: {node_file}", fg="green")
         _add_python_entry_point(pkg_name, node_name)
-        _add_launch_file_boilerplate(pkg_name, node_name) # Call the new function
+        _add_launch_file_boilerplate(pkg_name, node_name) 
+        _add_install_rule_for_launch_dir(pkg_name)
+        # Call the new function
     elif os.path.exists(os.path.join(pkg_path, 'CMakeLists.txt')):
         # C++ package
         node_dir = os.path.join(pkg_path, 'src')
