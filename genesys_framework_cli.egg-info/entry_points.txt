@@ -1,0 +1,2 @@
+[console_scripts]
+framework = framework_cli.main:cli

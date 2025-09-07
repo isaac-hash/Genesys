@@ -1,0 +1,10 @@
+pyproject.toml
+framework_cli/__init__.py
+framework_cli/main.py
+framework_core/__init__.py
+genesys_framework_cli.egg-info/PKG-INFO
+genesys_framework_cli.egg-info/SOURCES.txt
+genesys_framework_cli.egg-info/dependency_links.txt
+genesys_framework_cli.egg-info/entry_points.txt
+genesys_framework_cli.egg-info/requires.txt
+genesys_framework_cli.egg-info/top_level.txt

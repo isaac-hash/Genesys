@@ -1,0 +1,12 @@
+[project]
+name = "genesys-framework-cli"
+version = "0.1.0"
+dependencies = [
+    "click",
+]
+
+[project.scripts]
+framework = "framework_cli.main:cli"
+
+[tool.setuptools.packages.find]
+where = ["."]
