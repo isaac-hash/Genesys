@@ -473,10 +473,9 @@ int main(int argc, char **argv) {{
 @cli.command(name='make:pkg')
 @click.argument('package_name')
 @click.option('--with-node', is_flag=True, help='Create an initial node for the package.')
-@click.option('--build-type', '-t', default='ament_python', type=click.Choice(['ament_python', 'ament_cmake']), help='The build type for the package.')
 @click.option('--dependencies', '-d', multiple=True, help='ROS 2 package dependencies.')
 @click.pass_context
-def make_pkg(ctx, package_name, with_node, build_type, dependencies):
+def make_pkg(ctx, package_name, with_node, dependencies):
     """Creates a new ROS 2 package inside the src/ directory."""
 
     # Verify workspace root
@@ -486,6 +485,15 @@ def make_pkg(ctx, package_name, with_node, build_type, dependencies):
         sys.exit(1)
 
     click.echo(f"Creating new ROS 2 package: {package_name}")
+
+    # Interactive prompt for language choice
+    lang_choice = click.prompt(
+        'Choose a language for the package',
+        type=click.Choice(['Python', 'C++'], case_sensitive=False),
+        default='Python',
+        show_default=True
+    )
+    build_type = 'ament_python' if lang_choice.lower() == 'python' else 'ament_cmake'
 
     command = [
         'ros2', 'pkg', 'create',
