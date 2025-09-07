@@ -244,7 +244,7 @@ def run(node_name):
     click.echo(f"Attempting to run node: {node_name}")
 
     # 2. Get the sourcing command, which now includes the local install space.
-    source_prefix, shell_exec = _get_sourcing_command()
+    source_prefix, shell_exec = _get_sourcing_command(clean_env=True)
     
     # 3. Find the package for the given node by listing all executables.
     list_exec_command = source_prefix + "ros2 pkg executables"
