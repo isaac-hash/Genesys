@@ -2,26 +2,44 @@ import os
 import click
 import subprocess
 import sys
+import shutil
 
 @click.group()
 def cli():
     """Genesys CLI for ROS 2 workspace management."""
     pass
 
-def _get_sourcing_command():
-    """Returns the platform-specific command to source the ROS 2 environment."""
+def _get_sourcing_command(exit_on_error=True):
+    """
+    Returns the platform-specific command to source the ROS 2 and local workspace environments.
+    """
     ros_distro = os.environ.get('ROS_DISTRO')
     if not ros_distro:
-        click.secho("Error: ROS_DISTRO environment variable not set.", fg="red")
-        click.secho("Cannot find ROS 2 installation to source.", fg="yellow")
-        sys.exit(1)
-
-    if sys.platform.startswith('linux') or sys.platform == 'darwin':
-        setup_script = f"/opt/ros/{ros_distro}/setup.bash"
-        if not os.path.exists(setup_script):
-            click.secho(f"Error: ROS 2 setup script not found at {setup_script}", fg="red")
+        if exit_on_error:
+            click.secho("Error: ROS_DISTRO environment variable not set.", fg="red")
+            click.secho("Cannot find ROS 2 installation to source.", fg="yellow")
             sys.exit(1)
-        return f"source {setup_script} && ", '/bin/bash'
+        return None, None
+
+    # Platform-specific setup
+    if sys.platform.startswith('linux') or sys.platform == 'darwin':
+        shell_exec = '/bin/bash'
+        distro_setup_script = f"/opt/ros/{ros_distro}/setup.bash"
+        ws_setup_script = "./install/setup.bash" # Relative to workspace root
+        
+        if not os.path.exists(distro_setup_script):
+            if exit_on_error:
+                click.secho(f"Error: ROS 2 setup script not found at {distro_setup_script}", fg="red")
+                sys.exit(1)
+            return None, None
+            
+        # Chain the sourcing commands
+        command_parts = [f"source {distro_setup_script}"]
+        if os.path.exists(ws_setup_script):
+            command_parts.append(f"source {ws_setup_script}")
+            
+        source_prefix = " && ".join(command_parts) + " && "
+        return source_prefix, shell_exec
     
     elif sys.platform == 'win32':
         click.secho("Warning: Auto-sourcing on Windows is not fully implemented. Please run this from a sourced ROS 2 terminal.", fg="yellow", err=True)
@@ -29,7 +47,48 @@ def _get_sourcing_command():
     
     else:
         click.secho(f"Unsupported platform for auto-sourcing: {sys.platform}", fg="red")
-        sys.exit(1)
+        if exit_on_error:
+            sys.exit(1)
+        return None, None
+
+@cli.command()
+def doctor():
+    """Checks the environment for potential issues and provides solutions."""
+    click.secho("Running Genesys environment doctor...", fg="cyan", bold=True)
+    all_ok = True
+
+    # 1. Check if 'framework' command is on the PATH
+    click.echo("\nChecking PATH configuration...")
+    script_path = shutil.which('framework')
+    if script_path and os.path.dirname(script_path) not in os.environ.get('PATH', '').split(os.pathsep):
+        all_ok = False
+        script_dir = os.path.dirname(script_path)
+        click.secho("[X] PATH Issue Detected", fg="red")
+        click.echo(f"  The 'framework' command is in a directory not on your system's PATH: {script_dir}")
+        click.echo("\n  To fix this for your current session, run:")
+        click.secho(f'  export PATH="{script_dir}:$PATH"', fg="yellow")
+        click.echo("\n  To fix this permanently, copy and paste the following command:")
+        click.secho(f"  echo 'export PATH=\"{script_dir}:$PATH\"' >> ~/.bashrc && source ~/.bashrc", fg="green")
+
+    else:
+        click.secho("[✓] PATH configuration is correct.", fg="green")
+
+    # 2. Check for ROS_DISTRO and sourcing ability
+    click.echo("\nChecking ROS 2 environment...")
+    source_prefix, _ = _get_sourcing_command(exit_on_error=False)
+    if source_prefix is None:
+        all_ok = False
+        click.secho("[X] ROS 2 Environment Issue Detected", fg="red")
+        click.echo("  The ROS_DISTRO environment variable is not set or the setup script is missing.")
+        click.echo("  Please ensure a ROS 2 distribution is installed and the ROS_DISTRO variable is set.")
+    else:
+        click.secho("[✓] ROS 2 environment sourcing is configured.", fg="green")
+
+    click.echo("-" * 40)
+    if all_ok:
+        click.secho("✨ Your Genesys environment is ready to go!", fg="cyan", bold=True)
+    else:
+        click.secho("Please address the issues above to ensure Genesys works correctly.", fg="yellow")
 
 @cli.command()
 @click.argument('project_name')
