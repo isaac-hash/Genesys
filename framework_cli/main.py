@@ -360,7 +360,7 @@ def generate_launch_description():
             name='{node_name}',
             output='screen',
             emulate_tty=True
-        )
+        ),
     ])
 """
         with open(launch_file, 'w') as f:
@@ -376,7 +376,7 @@ def _add_node_to_launch(pkg_name, node_name):
     with open(launch_file, 'r') as f:
         content = f.read()
 
-    # Build the new Node block
+    # Build the new Node block (with trailing comma!)
     new_node_block = f"""        Node(
             package='{pkg_name}',
             executable='{node_name}',
@@ -389,15 +389,18 @@ def _add_node_to_launch(pkg_name, node_name):
         click.secho(f"Launch file already contains '{node_name}'.", fg="yellow")
         return
 
-    # Insert before the closing ])
-    if "])" in content:
-        content = content.replace("])", new_node_block + "\n    ])")
+    # Regex: insert before the closing ] of LaunchDescription([...])
+    updated_content = re.sub(
+        r"(\s*)\]\)\s*$",
+        f"{new_node_block}\n    ])",
+        content,
+        flags=re.MULTILINE
+    )
 
     with open(launch_file, 'w') as f:
-        f.write(content)
+        f.write(updated_content)
 
     click.secho(f"✓ Added '{node_name}' to launch file: {launch_file}", fg="green")
-
 
 @cli.command(name='make:node')
 @click.argument('node_name')
