@@ -357,7 +357,8 @@ int main(int argc, char **argv) {{
 @click.option('--with-node', is_flag=True, help='Create an initial node for the package.')
 @click.option('--build-type', '-t', default='ament_python', type=click.Choice(['ament_python', 'ament_cmake']), help='The build type for the package.')
 @click.option('--dependencies', '-d', multiple=True, help='ROS 2 package dependencies.')
-def make_pkg(package_name, with_node, build_type, dependencies):
+@click.pass_context
+def make_pkg(ctx, package_name, with_node, build_type, dependencies):
     """Creates a new ROS 2 package inside the src/ directory."""
 
     # Verify workspace root
@@ -397,7 +398,7 @@ def make_pkg(package_name, with_node, build_type, dependencies):
         sys.exit(1)
 
     if with_node:
-        make_node(node_name=f"{package_name}_node", pkg_name=package_name)
+        ctx.invoke(make_node, node_name=f"{package_name}_node", pkg_name=package_name)
 
 @cli.command()
 @click.argument('launch_target')
