@@ -402,6 +402,43 @@ def _add_node_to_launch(pkg_name, node_name):
 
     click.secho(f"✓ Added '{node_name}' to launch file: {launch_file}", fg="green")
 
+def _add_default_launch_file(pkg_name):
+    """Auto-generates a default.launch.py that includes the main package launch file."""
+    launch_dir = os.path.join('src', pkg_name, 'launch')
+    os.makedirs(launch_dir, exist_ok=True)
+    default_launch_file = os.path.join(launch_dir, "default.launch.py")
+    pkg_specific_launch_file = f"{pkg_name}_launch.py"
+
+    # Don't overwrite if it exists to preserve user customizations
+    if os.path.exists(default_launch_file):
+        return
+
+    boilerplate = f"""import os
+from ament_index_python.packages import get_package_share_directory
+from launch import LaunchDescription
+from launch.actions import IncludeLaunchDescription
+from launch.launch_description_sources import PythonLaunchDescriptionSource
+
+def generate_launch_description():
+    \"\"\"
+    This is the default launch file for the '{pkg_name}' package.
+    It is launched when running 'framework launch --all'.
+    By default, it includes the package-specific launch file.
+    \"\"\"
+    pkg_specific_launch_file_path = os.path.join(
+        get_package_share_directory('{pkg_name}'),
+        'launch',
+        '{pkg_specific_launch_file}'
+    )
+
+    return LaunchDescription([
+        IncludeLaunchDescription(PythonLaunchDescriptionSource(pkg_specific_launch_file_path))
+    ])
+"""
+    with open(default_launch_file, 'w') as f:
+        f.write(boilerplate)
+    click.secho(f"✓ Auto-generated default launch file: {default_launch_file}", fg="green")
+
 @cli.command(name='make:node')
 @click.argument('node_name')
 @click.option('--pkg', 'pkg_name', required=True, help='The name of the package to add the node to.')
@@ -439,10 +476,10 @@ if __name__ == '__main__':
             f.write(boilerplate)
         click.secho(f"✓ Created Python node file: {node_file}", fg="green")
         _add_python_entry_point(pkg_name, node_name)
-        _add_launch_file_boilerplate(pkg_name, node_name) 
-        _add_install_rule_for_launch_dir(pkg_name)
+        _add_launch_file_boilerplate(pkg_name, node_name)
         _add_node_to_launch(pkg_name, node_name)
-        # Call the new function
+        _add_default_launch_file(pkg_name)
+        _add_install_rule_for_launch_dir(pkg_name)
     elif os.path.exists(os.path.join(pkg_path, 'CMakeLists.txt')):
         # C++ package
         node_dir = os.path.join(pkg_path, 'src')
@@ -463,7 +500,10 @@ int main(int argc, char **argv) {{
             f.write(boilerplate)
         click.secho(f"✓ Created C++ node file: {node_file}", fg="green")
         _add_cpp_executable(pkg_name, node_name)
+        _add_launch_file_boilerplate(pkg_name, node_name)
+        _add_node_to_launch(pkg_name, node_name)
         _add_install_rule_for_launch_dir_cpp(pkg_name)
+        _add_default_launch_file(pkg_name)
     else:
         click.secho(f"Error: Could not determine package type for '{pkg_name}'. No setup.py or CMakeLists.txt found.", fg="red")
         sys.exit(1)
@@ -527,47 +567,125 @@ def make_pkg(ctx, package_name, with_node, dependencies):
         ctx.invoke(make_node, node_name=f"{package_name}_node", pkg_name=package_name)
 
 @cli.command()
-@click.argument('launch_target')
-def launch(launch_target):
+@click.argument('launch_target', required=False)
+@click.option('--all', 'launch_all', is_flag=True, help='Launch the default.launch.py from all packages.')
+@click.pass_context
+def launch(ctx, launch_target, launch_all):
     """
-    Launches a ROS 2 launch file.
+    Launches ROS 2 nodes.
 
-    Can be used in two ways:\n
+    Can be used in several ways:\n
+    - framework launch --all (launches default.launch.py from all packages)\n
     - framework launch <pkg_name>:<launch_file.py>\n
     - framework launch <pkg_name> (launches <pkg_name>_launch.py by default)
     """
-    # 1. Verify we are in a workspace that has been built.
+    if launch_all and launch_target:
+        click.secho("Error: Cannot use --all with a specific launch target.", fg="red")
+        sys.exit(1)
+    
+    if not launch_all and not launch_target:
+        click.secho("Error: Must provide a launch target or use the --all flag.", fg="red")
+        click.echo(ctx.get_help())
+        sys.exit(1)
+
+    # Verify we are in a workspace that has been built.
     if not os.path.isdir('install'):
         click.secho("Error: 'install' directory not found. Have you built the workspace yet?", fg="red")
         click.secho("Try running 'framework build' first.", fg="yellow")
         sys.exit(1)
 
-    # 2. Parse the launch target
-    if ':' in launch_target:
-        pkg_name, launch_file = launch_target.split(':', 1)
-    else:
-        pkg_name = launch_target
-        launch_file = f"{pkg_name}_launch.py"
-        click.echo(f"No launch file specified, defaulting to '{launch_file}'")
-
-    # 3. Get the sourcing command
     source_prefix, shell_exec = _get_sourcing_command(clean_env=True)
 
-    # 4. Construct and run the final command
-    launch_command = f"ros2 launch {pkg_name} {launch_file}"
-    command_to_run = source_prefix + launch_command
+    if launch_all:
+        click.echo("Searching for 'default.launch.py' in all packages...")
+        
+        src_dir = 'src'
+        if not os.path.isdir(src_dir):
+            click.secho("Error: 'src' directory not found. This command must be run from the workspace root.", fg="red")
+            sys.exit(1)
 
-    click.echo(f"Executing: {launch_command}")
+        packages = [d for d in os.listdir(src_dir) if os.path.isdir(os.path.join(src_dir, d))]
+        
+        default_launches = []
+        for pkg in packages:
+            default_launch_file_src = os.path.join(src_dir, pkg, 'launch', 'default.launch.py')
+            if os.path.exists(default_launch_file_src):
+                default_launches.append((pkg, 'default.launch.py'))
+        
+        if not default_launches:
+            click.secho("No 'default.launch.py' files found in any package.", fg="yellow")
+            return
 
-    try:
-        # Use Popen to stream output and allow user to Ctrl+C
-        process = subprocess.Popen(command_to_run, shell=True, executable=shell_exec)
-        process.wait()
-    except KeyboardInterrupt:
-        click.echo("\nLaunch interrupted by user.")
-        process.terminate()
-    except Exception as e:
-        click.secho(f"An error occurred during launch: {e}", fg="red")
+        click.echo("Found default launch files in:")
+        for pkg, _ in default_launches:
+            click.echo(f"  - {pkg}")
+
+        # Generate a master launch file
+        import tempfile
+        
+        launch_includes = []
+        for pkg, launch_file in default_launches:
+            launch_includes.append(
+                f"        IncludeLaunchDescription(PythonLaunchDescriptionSource(os.path.join(get_package_share_directory('{pkg}'), 'launch', '{launch_file}'))),"
+            )
+        
+        launch_content_parts = [
+            "import os",
+            "from ament_index_python.packages import get_package_share_directory",
+            "from launch import LaunchDescription",
+            "from launch.actions import IncludeLaunchDescription",
+            "from launch.launch_description_sources import PythonLaunchDescriptionSource",
+            "",
+            "def generate_launch_description():",
+            "    return LaunchDescription([",
+            *launch_includes,
+            "    ])"
+        ]
+        launch_content = "\n".join(launch_content_parts)
+
+        temp_launch_file = None
+        process = None
+        try:
+            with tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='_all_launch.py') as f:
+                temp_launch_file = f.name
+                f.write(launch_content)
+            
+            command_to_run = source_prefix + f"ros2 launch {temp_launch_file}"
+            click.echo(f"\nExecuting master launch file: {os.path.basename(temp_launch_file)}")
+            process = subprocess.Popen(command_to_run, shell=True, executable=shell_exec)
+            process.wait()
+        except KeyboardInterrupt:
+            click.echo("\nLaunch interrupted by user.")
+            if process and process.poll() is None:
+                process.terminate()
+        except Exception as e:
+            click.secho(f"An error occurred during launch: {e}", fg="red")
+        finally:
+            if temp_launch_file and os.path.exists(temp_launch_file):
+                os.remove(temp_launch_file)
+
+    else: # launch_target is provided
+        if ':' in launch_target:
+            pkg_name, launch_file = launch_target.split(':', 1)
+        else:
+            pkg_name = launch_target
+            launch_file = f"{pkg_name}_launch.py"
+            click.echo(f"No launch file specified, defaulting to '{launch_file}'")
+
+        launch_command = f"ros2 launch {pkg_name} {launch_file}"
+        command_to_run = source_prefix + launch_command
+
+        click.echo(f"Executing: {launch_command}")
+
+        try:
+            process = subprocess.Popen(command_to_run, shell=True, executable=shell_exec)
+            process.wait()
+        except KeyboardInterrupt:
+            click.echo("\nLaunch interrupted by user.")
+            if process and process.poll() is None:
+                process.terminate()
+        except Exception as e:
+            click.secho(f"An error occurred during launch: {e}", fg="red")
 
 @cli.command()
 @click.argument('node_name')
