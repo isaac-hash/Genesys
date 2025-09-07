@@ -262,14 +262,16 @@ def run(node_name):
     package_name = None
     available_nodes = []
     for line in result.stdout.strip().split('\n'):
-        if ':' not in line:
+        parts = line.split()
+        if len(parts) < 2:
             continue
-        pkg, nodes_str = line.split(':', 1)
-        nodes = nodes_str.strip().split()
+        pkg = parts[0]
+        nodes = parts[1:]
         available_nodes.extend(nodes)
         if node_name in nodes:
-            package_name = pkg.strip()
+            package_name = pkg
             break
+
     
     if not package_name:
         click.secho(f"Error: Node '{node_name}' not found in any package.", fg="red")
