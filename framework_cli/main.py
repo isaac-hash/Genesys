@@ -303,49 +303,45 @@ def _add_python_entry_point(pkg_name, node_name):
     with open(setup_file, 'r') as f:
         content = f.read()
 
-    new_entry = f"'{node_name} = {pkg_name}.{node_module_name}:main'"
-
     # Use re.DOTALL to match newlines. Use named groups for clarity.
     match = re.search(
         r"(?P<pre>('|\")console_scripts('|\")\s*:\s*\[)(?P<scripts>[^\]]*)(?P<post>\])",
         content,
         re.DOTALL
     )
-    
+
     if not match:
         click.secho(f"Error: Could not find 'console_scripts' in {setup_file}.", fg="red")
         return
 
     scripts_content = match.group('scripts')
-    
+
     # Check if node is already registered
     if f"'{node_name} =" in scripts_content or f'"{node_name} =' in scripts_content:
         click.secho(f"Node '{node_name}' already exists in {setup_file}.", fg="yellow")
         return
 
-    # Find the indentation of the last script line to match it.
+    new_entry = f"'{node_name} = {pkg_name}.{node_module_name}:main'"
+
+    # Find the last non-empty line in the scripts block
     lines = [line for line in scripts_content.split('\n') if line.strip()]
+
     if lines:
+        # The list has existing entries.
         last_line = lines[-1]
         indentation = " " * (len(last_line) - len(last_line.lstrip()))
-        
-        # This is the critical fix: add a comma to the last entry if it's missing.
+        text_to_insert = ""
         if not last_line.strip().endswith(','):
-            content = content.replace(last_line, last_line + ',')
+            text_to_insert += ","
+        text_to_insert += f"\n{indentation}{new_entry}"
+        updated_content = content.replace(last_line, last_line + text_to_insert)
     else:
-        # If the list is empty, determine indentation from the 'console_scripts' line
+        # The list is empty.
         pre_match_line_start = content.rfind('\n', 0, match.start('scripts')) + 1
         indentation = " " * (match.start('scripts') - pre_match_line_start) + "    "
-
-    # Re-read content after potential modification
-    with open(setup_file, 'r') as f:
-        content = f.read()
-
-    # Find the insertion point, which is right before the closing bracket of the list.
-    insertion_point = match.end('scripts')
-    new_line = f"\n{indentation}{new_entry}"
-
-    updated_content = content[:insertion_point] + new_line + content[insertion_point:]
+        insertion = f"\n{indentation}{new_entry}\n"
+        insertion_point = match.end('scripts')
+        updated_content = content[:insertion_point] + insertion + content[insertion_point:]
 
     with open(setup_file, 'w') as f:
         f.write(updated_content)
