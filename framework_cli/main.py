@@ -303,27 +303,50 @@ def _add_python_entry_point(pkg_name, node_name):
     with open(setup_file, 'r') as f:
         content = f.read()
 
-    new_entry = f"'{node_name} = {pkg_name}.{node_module_name}:main',"
+    new_entry = f"'{node_name} = {pkg_name}.{node_module_name}:main'"
 
-    # Find the console_scripts list
-    match = re.search(r"('|\")console_scripts('|\")\s*:\s*\[([^\]]*)\]", content)
+    # Use re.DOTALL to match newlines. Use named groups for clarity.
+    match = re.search(
+        r"(?P<pre>('|\")console_scripts('|\")\s*:\s*\[)(?P<scripts>[^\]]*)(?P<post>\])",
+        content,
+        re.DOTALL
+    )
     
     if not match:
         click.secho(f"Error: Could not find 'console_scripts' in {setup_file}.", fg="red")
-        click.secho("Please add the entry point manually.", fg="yellow")
         return
 
-    scripts_content = match.group(3)
-    if new_entry.split('=')[0].strip() in scripts_content:
+    scripts_content = match.group('scripts')
+    
+    # Check if node is already registered
+    if f"'{node_name} =" in scripts_content or f'"{node_name} =' in scripts_content:
         click.secho(f"Node '{node_name}' already exists in {setup_file}.", fg="yellow")
         return
 
-    # Add the new entry with proper indentation
-    indentation = " " * (match.start() - content.rfind('\n', 0, match.start()) -1)
-    new_scripts_content = f"{scripts_content.strip()}\n{indentation}    {new_entry}\n{indentation}"
-    
-    updated_content = content[:match.start(3)] + new_scripts_content + content[match.end(3):]
-    
+    # Find the indentation of the last script line to match it.
+    lines = [line for line in scripts_content.split('\n') if line.strip()]
+    if lines:
+        last_line = lines[-1]
+        indentation = " " * (len(last_line) - len(last_line.lstrip()))
+        
+        # This is the critical fix: add a comma to the last entry if it's missing.
+        if not last_line.strip().endswith(','):
+            content = content.replace(last_line, last_line + ',')
+    else:
+        # If the list is empty, determine indentation from the 'console_scripts' line
+        pre_match_line_start = content.rfind('\n', 0, match.start('scripts')) + 1
+        indentation = " " * (match.start('scripts') - pre_match_line_start) + "    "
+
+    # Re-read content after potential modification
+    with open(setup_file, 'r') as f:
+        content = f.read()
+
+    # Find the insertion point, which is right before the closing bracket of the list.
+    insertion_point = match.end('scripts')
+    new_line = f"\n{indentation}{new_entry}"
+
+    updated_content = content[:insertion_point] + new_line + content[insertion_point:]
+
     with open(setup_file, 'w') as f:
         f.write(updated_content)
     
