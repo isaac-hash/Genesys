@@ -198,18 +198,13 @@ def make_pkg(package_name, with_node):
             build_type = 'ament_cmake'
         click.echo(f"Using build type: {build_type}")
 
-    # Run ros2 pkg create
+    # Run ros2 pkg create (without --node-name, we’ll handle node ourselves)
     command = [
         'ros2', 'pkg', 'create',
         '--build-type', build_type,
         '--destination-directory', 'src',
         package_name
     ]
-
-    if with_node:
-        node_name = f"{package_name}_node"
-        command.extend(['--node-name', node_name])
-        click.echo(f"Adding initial node: {node_name}")
 
     source_prefix, shell_exec = _get_sourcing_command(clean_env=True)
     command_to_run = source_prefix + ' '.join(command)
@@ -231,6 +226,7 @@ def make_pkg(package_name, with_node):
 
     # --- Extra: Auto-generate Python node + update setup.py ---
     if with_node and language == 'python':
+        node_name = f"{package_name}_node"
         pkg_dir = os.path.join('src', package_name, package_name)
         os.makedirs(pkg_dir, exist_ok=True)
 
@@ -266,9 +262,7 @@ if __name__ == "__main__":
             with open(setup_file, 'r') as f:
                 setup_contents = f.read()
 
-            # Inject entry point only if not already present
             if 'console_scripts' not in setup_contents:
-                insert_point = setup_contents.rfind("setup(")
                 new_entry = f"""
     entry_points={{
         'console_scripts': [
