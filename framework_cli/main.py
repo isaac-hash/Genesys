@@ -2,6 +2,7 @@ import os
 import click
 import subprocess
 import sys
+import re
 import shutil
 
 @click.group()
@@ -229,60 +230,6 @@ def make_pkg(package_name, with_node):
         click.echo(e.stderr or e.stdout)
         sys.exit(1)
 
-    # --- Extra: Auto-generate Python node + update setup.py ---
-    if with_node and language == 'python':
-        pkg_dir = os.path.join('src', package_name, package_name)
-        os.makedirs(pkg_dir, exist_ok=True)
-
-        node_file = os.path.join(pkg_dir, f"{node_name}.py")
-        if not os.path.exists(node_file):
-            with open(node_file, 'w') as f:
-                f.write(f"""import rclpy
-from rclpy.node import Node
-
-
-class {package_name.capitalize()}Node(Node):
-    def __init__(self):
-        super().__init__("{package_name}_node")
-        self.get_logger().info("Node '{node_name}' has started!")
-
-
-def main(args=None):
-    rclpy.init(args=args)
-    node = {package_name.capitalize()}Node()
-    rclpy.spin(node)
-    node.destroy_node()
-    rclpy.shutdown()
-
-
-if __name__ == "__main__":
-    main()
-""")
-            click.secho(f"✓ Default Python node created: {node_file}", fg="green")
-
-        # Update setup.py to add console_scripts entry
-        setup_file = os.path.join('src', package_name, 'setup.py')
-        if os.path.exists(setup_file):
-            with open(setup_file, 'r') as f:
-                setup_contents = f.read()
-
-            # Inject entry point only if not already present
-            if 'console_scripts' not in setup_contents:
-                insert_point = setup_contents.rfind("setup(")
-                new_entry = f"""
-    entry_points={{
-        'console_scripts': [
-            '{node_name} = {package_name}.{node_name}:main'
-        ],
-    }},
-"""
-                setup_contents = setup_contents.replace("setup(", "setup(\n" + new_entry, 1)
-
-                with open(setup_file, 'w') as f:
-                    f.write(setup_contents)
-
-                click.secho(f"✓ setup.py updated with console script for {node_name}", fg="green")
-
 @cli.command()
 @click.argument('node_name')
 def run(node_name):
@@ -347,6 +294,140 @@ def run(node_name):
     except KeyboardInterrupt:
         click.echo("\nNode execution interrupted by user.")
         process.terminate()
+
+def _add_python_entry_point(pkg_name, node_name):
+    """Adds a new console_script entry to a package's setup.py file."""
+    setup_file = os.path.join('src', pkg_name, 'setup.py')
+    node_module_name = node_name.replace('.py', '')
+
+    with open(setup_file, 'r') as f:
+        content = f.read()
+
+    new_entry = f"'{node_name} = {pkg_name}.{node_module_name}:main',"
+
+    # Find the console_scripts list
+    match = re.search(r"('|\")console_scripts('|\")\s*:\s*\[([^\]]*)\]", content)
+    
+    if not match:
+        click.secho(f"Error: Could not find 'console_scripts' in {setup_file}.", fg="red")
+        click.secho("Please add the entry point manually.", fg="yellow")
+        return
+
+    scripts_content = match.group(3)
+    if new_entry.split('=')[0].strip() in scripts_content:
+        click.secho(f"Node '{node_name}' already exists in {setup_file}.", fg="yellow")
+        return
+
+    # Add the new entry with proper indentation
+    indentation = " " * (match.start() - content.rfind('\n', 0, match.start()) -1)
+    new_scripts_content = f"{scripts_content.strip()}\n{indentation}    {new_entry}\n{indentation}"
+    
+    updated_content = content[:match.start(3)] + new_scripts_content + content[match.end(3):]
+    
+    with open(setup_file, 'w') as f:
+        f.write(updated_content)
+    
+    click.secho(f"✓ Registered '{node_name}' in {setup_file}", fg="green")
+
+def _add_cpp_executable(pkg_name, node_name):
+    """Adds a new executable and install rule to a package's CMakeLists.txt."""
+    cmake_file = os.path.join('src', pkg_name, 'CMakeLists.txt')
+    node_src_file = f"src/{node_name}.cpp"
+
+    with open(cmake_file, 'r') as f:
+        content = f.read()
+
+    if f'add_executable({node_name}' in content:
+        click.secho(f"Node '{node_name}' already appears to be registered in {cmake_file}.", fg="yellow")
+        return
+
+    # Find the ament_package() call to insert before it
+    ament_package_call = re.search(r"ament_package\(\)", content)
+    if not ament_package_call:
+        click.secho(f"Error: Could not find ament_package() call in {cmake_file}.", fg="red")
+        return
+
+    insert_pos = ament_package_call.start()
+    new_cmake_commands = f"""
+add_executable({node_name} {node_src_file})
+ament_target_dependencies({node_name} rclcpp)
+
+install(TARGETS
+  {node_name}
+  DESTINATION lib/${{PROJECT_NAME}}
+)
+
+"""
+    updated_content = content[:insert_pos] + new_cmake_commands + content[insert_pos:]
+
+    with open(cmake_file, 'w') as f:
+        f.write(updated_content)
+    
+    click.secho(f"✓ Registered '{node_name}' in {cmake_file}", fg="green")
+
+@cli.command(name='make:node')
+@click.argument('node_name')
+@click.option('--pkg', 'pkg_name', required=True, help='The name of the package to add the node to.')
+def make_node(node_name, pkg_name):
+    """Creates a new node file and registers it in an existing package."""
+    pkg_path = os.path.join('src', pkg_name)
+    if not os.path.isdir(pkg_path):
+        click.secho(f"Error: Package '{pkg_name}' not found at {pkg_path}", fg="red")
+        sys.exit(1)
+
+    # Determine package type
+    if os.path.exists(os.path.join(pkg_path, 'setup.py')):
+        # Python package
+        node_dir = os.path.join(pkg_path, pkg_name)
+        os.makedirs(node_dir, exist_ok=True)
+        node_file = os.path.join(node_dir, f"{node_name}.py")
+        boilerplate = f"""import rclpy
+from rclpy.node import Node
+
+class {node_name.capitalize()}(Node):
+    def __init__(self):
+        super().__init__('{node_name}')
+        self.get_logger().info('Node {node_name} has been started.')
+
+def main(args=None):
+    rclpy.init(args=args)
+    node = {node_name.capitalize()}()
+    rclpy.spin(node)
+    rclpy.shutdown()
+
+if __name__ == '__main__':
+    main()
+"""
+        with open(node_file, 'w') as f:
+            f.write(boilerplate)
+        click.secho(f"✓ Created Python node file: {node_file}", fg="green")
+        _add_python_entry_point(pkg_name, node_name)
+
+    elif os.path.exists(os.path.join(pkg_path, 'CMakeLists.txt')):
+        # C++ package
+        node_dir = os.path.join(pkg_path, 'src')
+        os.makedirs(node_dir, exist_ok=True)
+        node_file = os.path.join(node_dir, f"{node_name}.cpp")
+        boilerplate = f"""#include "rclcpp/rclcpp.hpp"
+
+int main(int argc, char **argv) {{
+    rclcpp::init(argc, argv);
+    auto node = std::make_shared<rclcpp::Node>("{node_name}");
+    RCLCPP_INFO(node->get_logger(), "Node {node_name} has been started.");
+    rclcpp::spin(node);
+    rclcpp::shutdown();
+    return 0;
+}}
+"""
+        with open(node_file, 'w') as f:
+            f.write(boilerplate)
+        click.secho(f"✓ Created C++ node file: {node_file}", fg="green")
+        _add_cpp_executable(pkg_name, node_name)
+    else:
+        click.secho(f"Error: Could not determine package type for '{pkg_name}'. No setup.py or CMakeLists.txt found.", fg="red")
+        sys.exit(1)
+
+    click.echo("\nRun 'framework build' to make the new node available.")
 
 if __name__ == '__main__':
     cli()
