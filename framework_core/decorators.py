@@ -3,7 +3,7 @@ import inspect
 import rclpy
 from rclpy.node import Node
 from rclpy.qos import QoSProfile, QoSReliabilityPolicy, QoSHistoryPolicy
-from rclpy.parameter import ParameterDescriptor, ParameterType, SetParametersResult
+from rcl_interfaces.msg import SetParametersResult, ParameterDescriptor, ParameterType
 from rclpy.lifecycle import LifecycleNode, TransitionCallbackReturn
 
 

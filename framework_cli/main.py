@@ -472,7 +472,7 @@ class {class_name}:
     def __init__(self):
         # The logger is automatically injected by the @node decorator.
         self.counter = 0
-        self.logger.info("{class_name} logic class has been constructed.")
+       
 
     @timer(period_sec=1.0)
     @publisher(topic="chatter", msg_type=String)
