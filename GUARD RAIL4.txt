@@ -1,0 +1,79 @@
+{
+  "command": "framework make:pkg",
+  "purpose": "Interactive wizard to generate ROS 2 packages with Genesys decorators/macros.",
+  "inputs": {
+    "mode": "interactive",
+    "questions": [
+      "Package name?",
+      "Language? (python/cpp)",
+      "Scaffold initial node? (y/n)",
+      "Which communication patterns? (publisher, subscriber, service, action, timer, lifecycle)",
+      "Add parameter handling? (y/n)",
+      "Add Dockerfile? (y/n)",
+      "Generate launch/config files? (y/n)"
+    ],
+    "presets_detection": "Based on chosen patterns, detect common package types (driver, nav, vision)."
+  },
+  "scaffolding_rules": {
+    "workspace": "Must exist inside Genesys workspace under /src/",
+    "structure": [
+      "/python/<package_name>/ or /cpp/<package_name>/",
+      "/launch/<package_name>.launch.py",
+      "/config/<package_name>.yaml",
+      "Dockerfile (optional)"
+    ],
+    "environment": "Auto-source ROS 2 + workspace environment before generation",
+    "templating": "Use decorators (Python) or macros (C++) to keep generated code minimal"
+  },
+  "decorators_python": {
+    "@node": "Defines a ROS 2 node, handles init/spin/shutdown",
+    "@publisher": "Creates publisher and publishes return value automatically",
+    "@subscriber": "Registers subscriber with callback method",
+    "@service": "Registers service server, auto-injects request/response",
+    "@action_server": "Registers action server, supports feedback/result generator",
+    "@timer": "Runs decorated method on a timer",
+    "@parameter": "Defines parameter, loads from /config YAML and injects",
+    "@lifecycle_node": "Registers lifecycle node with state callbacks"
+  },
+  "macros_cpp": {
+    "GENESYS_NODE": "Defines an rclcpp::Node with init/spin handled",
+    "GENESYS_PUBLISHER": "Scaffolds publisher, auto-manages QoS and topic",
+    "GENESYS_SUBSCRIBER": "Scaffolds subscription with callback",
+    "GENESYS_SERVICE": "Scaffolds service server",
+    "GENESYS_ACTION_SERVER": "Scaffolds action server",
+    "GENESYS_TIMER": "Scaffolds timer callback",
+    "GENESYS_PARAMETER": "Declares parameter + loads default from config",
+    "GENESYS_LIFECYCLE_NODE": "Defines lifecycle node with state transition hooks"
+  },
+  "developer_experience": {
+    "interactive_mode": "Always runs wizard unless --non-interactive is passed.",
+    "opinionated_defaults": "Always generates launch + config unless explicitly skipped.",
+    "preset_detection": "Wizard can suggest package type based on choices (driver/nav/vision).",
+    "extensibility": "Future: allow user to save their own templates and reuse."
+  },
+  "design_goal": "Minimal boilerplate, interactive DX, developers focus only on logic."
+}
+
+
+
+
+sample cli flow
+
+
+✨ Genesys Package Generator ✨
+
+✔ Package name: my_robot
+✔ Language [python/cpp]: python
+✔ Do you want to scaffold an initial node? [y/N]: y
+✔ What communication patterns? (select multiple)
+    1) Publisher
+    2) Subscriber
+    3) Service
+    4) Action Server
+    5) Timer
+    6) Lifecycle Node
+✔ Select: 1,2
+✔ Add parameter support? [y/N]: y
+✔ Add Dockerfile for deployment? [y/N]: n
+✔ Generate launch + config files? [y/N]: y
+✔ Preset detected: "vision-like" package
