@@ -1,12 +1,30 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
 [project]
 name = "genesys-framework-cli"
 version = "0.1.0"
+authors = [
+  { name="Chukwudulue Isaac", email="zikkychukwudulue@gmail.com" },
+]
+description = "A developer-friendly, opinionated framework for ROS 2 designed to reduce boilerplate, streamline common workflows, and provide a "happy path" for robotics development"
+readme = "README.md"
+requires-python = ">=3.8"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: APACHE License",
+    "Operating System :: Linux",
+]
 dependencies = [
     "click",
 ]
 
 [project.scripts]
 genesys = "framework_cli.main:cli"
+
+[project.urls]
+Homepage = "https://github.com/isaac-hash/Genesys.git"
 
 [tool.setuptools.packages.find]
 where = ["."]
