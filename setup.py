@@ -11,8 +11,8 @@ setup(
     ],
     entry_points={
         'console_scripts': [
-            # This creates the `framework` command and points it to your main function
-            'framework = framework_cli.main:cli',
+            # This creates the `genesys` command and points it to your main function
+            'genesys = framework_cli.main:cli',
         ],
     },
     author='Genesys Developer',

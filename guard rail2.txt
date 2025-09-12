@@ -28,18 +28,18 @@
   },
   {
     "use_case": "Launching a specific node or launch file",
-    "command": "framework launch <package_name>:<launch_file>",
+    "command": "genesys launch <package_name>:<launch_file>",
     "explanation": "This command serves two purposes: launching a specific launch file by name or, if no launch file is specified, launching the auto-generated launch file for the package. It handles all sourcing and path resolution automatically.",
     "subcommands": [
       {
-        "command": "framework launch <pkg_name>:<launch_file>",
+        "command": "genesys launch <package_name>:<launch_file>",
         "details": "Launches a specific launch file by name. The CLI resolves the path `src/<pkg_name>/launch/<launch_file>`.",
-        "example": "framework launch my_robot_pkg:robot_with_rviz.py"
+        "example": "genesys launch my_robot_pkg:robot_with_rviz.py"
       },
       {
-        "command": "framework launch <pkg_name>",
+        "command": "genesys launch <pkg_name>",
         "details": "Launches the auto-generated launch file for the specified package. The CLI resolves the path `src/<pkg_name>/launch/<pkg_name>_launch.py`.",
-        "example": "framework launch my_robot_pkg"
+        "example": "genesys launch my_robot_pkg"
       }
     ],
     "implementation_notes": {
@@ -53,13 +53,13 @@
   },
   {
     "use_case": "Launching a robot in a simulation",
-    "command": "framework sim <world_file>",
+    "command": "genesys sim <world_file>",
     "explanation": "This command launches a simulation environment (e.g., Gazebo) with a specific world and the robot model for the active package. It abstracts away the complex process of creating and executing simulation-specific launch files.",
     "subcommands": [
       {
-        "command": "framework sim <world_file>",
+        "command": "genesys sim <world_file>",
         "details": "Launches a simulation using the specified world file. A launch file is auto-generated in memory (or a temporary file) to spawn the robot model and any associated control nodes.",
-        "example": "framework sim empty.world"
+        "example": "genesys sim empty.world"
       }
     ],
     "implementation_notes": {

@@ -1,5 +1,5 @@
 {
-  "command": "framework make:pkg",
+  "command": "genesys make:pkg",
   "purpose": "Interactive wizard to generate ROS 2 packages with Genesys decorators/macros.",
   "inputs": {
     "mode": "interactive",

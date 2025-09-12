@@ -65,14 +65,14 @@ def doctor():
     click.secho("Running Genesys environment doctor...", fg="cyan", bold=True)
     all_ok = True
 
-    # 1. Check if 'framework' command is on the PATH
+    # 1. Check if 'genesys' command is on the PATH
     click.echo("\nChecking PATH configuration...")
-    script_path = shutil.which('framework')
+    script_path = shutil.which('genesys')
     if script_path and os.path.dirname(script_path) not in os.environ.get('PATH', '').split(os.pathsep):
         all_ok = False
         script_dir = os.path.dirname(script_path)
         click.secho("[X] PATH Issue Detected", fg="red")
-        click.echo(f"  The 'framework' command is in a directory not on your system's PATH: {script_dir}")
+        click.echo(f"  The 'genesys' command is in a directory not on your system's PATH: {script_dir}")
         click.echo("\n  To fix this for your current session, run:")
         click.secho(f'  export PATH="{script_dir}:$PATH"', fg="yellow")
         click.echo("\n  To fix this permanently, copy and paste the following command:")
@@ -565,7 +565,7 @@ int main(int argc, char * argv[])
         click.secho(f"Error: Could not determine package type for '{pkg_name}'. No setup.py or CMakeLists.txt found.", fg="red")
         sys.exit(1)
 
-    click.echo("\nRun 'framework build' to make the new node available.")
+    click.echo("\nRun 'genesys build' to make the new node available.")
 
 @cli.command(name='make:pkg')
 @click.argument('package_name')
@@ -632,9 +632,9 @@ def launch(ctx, launch_target, launch_all):
     Launches ROS 2 nodes.
 
     Can be used in several ways:\n
-    - framework launch --all (launches default.launch.py from all packages)\n
-    - framework launch <pkg_name>:<launch_file.py>\n
-    - framework launch <pkg_name> (launches <pkg_name>_launch.py by default)
+    - genesys launch --all (launches default.launch.py from all packages)\n
+    - genesys launch <pkg_name>:<launch_file.py>\n
+    - genesys launch <pkg_name> (launches <pkg_name>_launch.py by default)
     """
     if launch_all and launch_target:
         click.secho("Error: Cannot use --all with a specific launch target.", fg="red")
@@ -648,7 +648,7 @@ def launch(ctx, launch_target, launch_all):
     # Verify we are in a workspace that has been built.
     if not os.path.isdir('install'):
         click.secho("Error: 'install' directory not found. Have you built the workspace yet?", fg="red")
-        click.secho("Try running 'framework build' first.", fg="yellow")
+        click.secho("Try running 'genesys build' first.", fg="yellow")
         sys.exit(1)
 
     source_prefix, shell_exec = _get_sourcing_command(clean_env=True)
@@ -751,7 +751,7 @@ def run(node_name):
     # 1. Verify we are in a workspace that has been built.
     if not os.path.isdir('install'):
         click.secho("Error: 'install' directory not found. Have you built the workspace yet?", fg="red")
-        click.secho("Try running 'framework build' first.", fg="yellow")
+        click.secho("Try running 'genesys build' first.", fg="yellow")
         sys.exit(1)
 
     click.echo(f"Attempting to run node: {node_name}")
@@ -816,13 +816,13 @@ def sim(world_file):
     # 1. Verify workspace state
     if not os.path.isdir('install'):
         click.secho("Error: 'install' directory not found. Have you built the workspace yet?", fg="red")
-        click.secho("Try running 'framework build' first.", fg="yellow")
+        click.secho("Try running 'genesys build' first.", fg="yellow")
         sys.exit(1)
 
     sim_worlds_dir = 'sim/worlds'
     if not os.path.isdir(sim_worlds_dir):
         click.secho(f"Error: Simulation worlds directory not found at './{sim_worlds_dir}'", fg="red")
-        click.secho("Ensure your project was created with 'framework new'.", fg="yellow")
+        click.secho("Ensure your project was created with 'genesys new'.", fg="yellow")
         sys.exit(1)
 
     world_path = os.path.join(sim_worlds_dir, world_file)
@@ -895,7 +895,7 @@ def sim(world_file):
         process = subprocess.Popen(command_to_run, shell=True, executable=shell_exec)
         click.secho("\n✓ Simulation is starting...", fg="cyan")
         if robot_model_path:
-            click.echo("  Run your robot's control and logic nodes in a separate, sourced terminal (e.g., 'framework launch <pkg_name>').")
+            click.echo("  Run your robot's control and logic nodes in a separate, sourced terminal (e.g., 'genesys launch <pkg_name>').")
         process.wait()
     except KeyboardInterrupt:
         click.echo("\nSimulation interrupted by user.")
