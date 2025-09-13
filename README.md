@@ -35,7 +35,7 @@ The goal of Genesys is not to replace ROS 2, but to enhance it. It addresses com
     ```bash
     pip install genesys-framework-cli==0.1.0
     ```
-    This installs the `genesys` command in "editable" mode, so any changes you make to the source code are immediately reflected.
+    This installs the `genesys` command 
 
     # Make the command available immediately
     export PATH="$(python3 -m site --user-base)/bin:$PATH"
