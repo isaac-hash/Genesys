@@ -33,7 +33,7 @@ The goal of Genesys is not to replace ROS 2, but to enhance it. It addresses com
 2.  **Install the CLI:**
     Clone this repository and run the following command from the project root (`Genesys/`):
     ```bash
-    pip install -e .
+    pip install genesys-framework-cli==0.1.0
     ```
     This installs the `genesys` command in "editable" mode, so any changes you make to the source code are immediately reflected.
 
