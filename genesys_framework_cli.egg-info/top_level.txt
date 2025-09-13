@@ -1,2 +1,3 @@
+dist
 framework_cli
 framework_core

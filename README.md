@@ -37,6 +37,13 @@ The goal of Genesys is not to replace ROS 2, but to enhance it. It addresses com
     ```
     This installs the `genesys` command in "editable" mode, so any changes you make to the source code are immediately reflected.
 
+    # Make the command available immediately
+    export PATH="$(python3 -m site --user-base)/bin:$PATH"
+
+    # (Optional) Add permanently so you don't repeat this step
+    echo 'export PATH="$(python3 -m site --user-base)/bin:$PATH"' >> ~/.bashrc
+
+
 3.  **Verify Installation:**
     Open a **new terminal** and run the environment checker:
     ```bash

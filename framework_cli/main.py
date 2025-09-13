@@ -4,6 +4,7 @@ import subprocess
 import sys
 import re
 import shutil
+import sysconfig
 
 @click.group()
 def cli():
@@ -65,23 +66,43 @@ def doctor():
     click.secho("Running Genesys environment doctor...", fg="cyan", bold=True)
     all_ok = True
 
-    # 1. Check if 'genesys' command is on the PATH
+    # 1. Check if the user's script installation directory is on the PATH
     click.echo("\nChecking PATH configuration...")
-    script_path = shutil.which('genesys')
-    if script_path and os.path.dirname(script_path) not in os.environ.get('PATH', '').split(os.pathsep):
-        all_ok = False
-        script_dir = os.path.dirname(script_path)
-        click.secho("[X] PATH Issue Detected", fg="red")
-        click.echo(f"  The 'genesys' command is in a directory not on your system's PATH: {script_dir}")
-        click.echo("\n  To fix this for your current session, run:")
-        click.secho(f'  export PATH="{script_dir}:$PATH"', fg="yellow")
-        click.echo("\n  To fix this permanently, copy and paste the following command:")
-        click.secho(f"  echo 'export PATH=\"{script_dir}:$PATH\"' >> ~/.bashrc && source ~/.bashrc", fg="green")
+    # Get the directory where pip installs scripts for the current python environment
+    scripts_dir = sysconfig.get_path('scripts')
 
+    # Check if this directory is in the system's PATH environment variable
+    if scripts_dir not in os.environ.get('PATH', '').split(os.pathsep):
+        all_ok = False
+        click.secho("[X] PATH Issue Detected", fg="red")
+        click.echo(f"  Your local scripts directory ('{scripts_dir}') is not on your system's PATH.")
+        click.echo("  This can prevent you from running 'genesys' directly after installation.")
+
+        # Provide platform-specific instructions
+        if sys.platform.startswith('linux') or sys.platform == 'darwin':
+            click.echo("\n  To fix this for your current session, run:")
+            click.secho(f'  export PATH="{scripts_dir}:$PATH"', fg="yellow")
+            click.echo("\n  To fix this permanently, copy and paste the following command:")
+            # Detect shell to suggest the correct rc file (~/.bashrc, ~/.zshrc, etc.)
+            shell = os.environ.get("SHELL", "")
+            rc_file = ""
+            if "zsh" in shell:
+                rc_file = "~/.zshrc"
+            elif "bash" in shell:
+                rc_file = "~/.bashrc"
+            else:
+                # A safe fallback for other shells
+                rc_file = "your shell's startup file (e.g., ~/.bashrc, ~/.zshrc)"
+
+            click.secho(f"  echo 'export PATH=\"{scripts_dir}:$PATH\"' >> {rc_file}", fg="green")
+            click.echo(f"  After running the command, please start a new terminal session for the change to take effect.")
+        elif sys.platform == 'win32':
+            click.echo("\n  To fix this, you need to add the following directory to your 'Path' environment variable:")
+            click.secho(f"  {scripts_dir}", fg="yellow")
+            click.echo("  You can do this through 'Edit the system environment variables' in the Control Panel.")
     else:
         click.secho("[✓] PATH configuration is correct.", fg="green")
 
-    # 2. Check for ROS_DISTRO and sourcing ability
     click.echo("\nChecking ROS 2 environment...")
     source_prefix, _ = _get_sourcing_command(exit_on_error=False)
     if source_prefix is None:

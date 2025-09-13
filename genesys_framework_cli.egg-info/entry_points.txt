@@ -1,2 +1,2 @@
 [console_scripts]
-framework = framework_cli.main:cli
+genesys = framework_cli.main:cli
