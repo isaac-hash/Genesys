@@ -176,8 +176,14 @@ def node(node_name):
         class GenesysNodeLogicMixin:
             def _init_logic(self, user_cls_arg):
                 # This is called from the wrapper's __init__
-                self.user_instance = user_cls_arg()
+                # Create an instance of the user's class without calling __init__
+                self.user_instance = user_cls_arg.__new__(user_cls_arg)
+
+                # Inject the logger before calling the user's constructor
                 self.user_instance.logger = self.get_logger()
+
+                # Now, call the user's constructor
+                self.user_instance.__init__()
                 self._param_to_attr_map = {}
                 self._managed_publishers = []
                 self._managed_subscribers = []
