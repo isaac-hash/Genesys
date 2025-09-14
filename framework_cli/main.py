@@ -60,6 +60,280 @@ def _get_sourcing_command(exit_on_error=True, clean_env=False):
             sys.exit(1)
         return None, None
 
+def _run_sourcing_command(command_str, interactive=True, exit_on_error=True):
+    """
+    Runs a command string within a sourced environment.
+
+    :param command_str: The command to run (e.g., 'ros2 node list').
+    :param interactive: If True, streams output and allows user interruption.
+                        If False, captures output and prints at the end.
+    :param exit_on_error: If True, exits the CLI on command failure.
+    :return: True on success, False on failure.
+    """
+    source_prefix, shell_exec = _get_sourcing_command()
+    full_command = source_prefix + command_str
+
+    click.echo(f"Executing: {command_str}")
+
+    try:
+        if interactive:
+            process = subprocess.Popen(
+                full_command,
+                shell=True,
+                executable=shell_exec,
+                stdout=sys.stdout,
+                stderr=sys.stderr
+            )
+            process.wait()
+            if process.returncode != 0:
+                raise subprocess.CalledProcessError(process.returncode, full_command)
+        else:
+            result = subprocess.run(
+                full_command,
+                shell=True,
+                executable=shell_exec,
+                check=True,
+                capture_output=True,
+                text=True
+            )
+            if result.stdout:
+                click.echo(result.stdout)
+            if result.stderr:
+                click.echo(result.stderr, err=True)
+        return True
+    except KeyboardInterrupt:
+        click.echo("\nCommand interrupted by user.")
+        return False
+    except subprocess.CalledProcessError as e:
+        click.secho(f"\nCommand failed with exit code {e.returncode}.", fg="red")
+        if not interactive and hasattr(e, 'stderr') and e.stderr:
+            click.secho("Error output:", fg="yellow")
+            click.echo(e.stderr)
+        if exit_on_error:
+            sys.exit(1)
+        return False
+
+# --- ROS2 Passthrough Groups ---
+
+@cli.group()
+def node():
+    """Commands for interacting with ROS 2 nodes."""
+    pass
+
+@node.command("list")
+def node_list():
+    """List all running nodes."""
+    _run_sourcing_command("ros2 node list", interactive=False)
+
+@node.command("info")
+@click.argument("node_name")
+def node_info(node_name):
+    """Get information about a specific node."""
+    _run_sourcing_command(f"ros2 node info {node_name}", interactive=False)
+
+@cli.group()
+def topic():
+    """Commands for interacting with ROS 2 topics."""
+    pass
+
+@topic.command("list")
+def topic_list():
+    """List all active topics."""
+    _run_sourcing_command("ros2 topic list", interactive=False)
+
+@topic.command("info")
+@click.argument("topic_name")
+def topic_info(topic_name):
+    """Get information about a specific topic."""
+    _run_sourcing_command(f"ros2 topic info {topic_name}", interactive=False)
+
+@topic.command("echo")
+@click.argument("topic_name")
+def topic_echo(topic_name):
+    """Echo messages from a topic."""
+    _run_sourcing_command(f"ros2 topic echo {topic_name}", interactive=True)
+
+@topic.command("pub", context_settings=dict(ignore_unknown_options=True))
+@click.argument("topic_name")
+@click.argument("msg_type")
+@click.argument("args", nargs=-1, type=click.UNPROCESSED)
+def topic_pub(topic_name, msg_type, args):
+    """Publish a message to a topic."""
+    command = f"ros2 topic pub {topic_name} {msg_type} {' '.join(args)}"
+    _run_sourcing_command(command, interactive=True)
+
+@topic.command("bw")
+@click.argument("topic_name")
+def topic_bw(topic_name):
+    """Display bandwidth used by a topic."""
+    _run_sourcing_command(f"ros2 topic bw {topic_name}", interactive=True)
+
+@topic.command("find")
+@click.argument("msg_type")
+def topic_find(msg_type):
+    """Find topics by message type."""
+    _run_sourcing_command(f"ros2 topic find {msg_type}", interactive=False)
+
+@topic.command("record")
+@click.argument("topics", nargs=-1)
+def topic_record(topics):
+    """Record topics to a bag file (ros2 bag record)."""
+    cmd = "ros2 bag record"
+    if not topics:
+        click.echo("Recording all topics.")
+        cmd += " -a"
+    else:
+        click.echo(f"Recording topics: {', '.join(topics)}")
+        cmd += " " + " ".join(topics)
+    _run_sourcing_command(cmd, interactive=True)
+
+@topic.command("replay")
+@click.argument("bag_file")
+def topic_replay(bag_file):
+    """Play back a bag file (ros2 bag play)."""
+    _run_sourcing_command(f"ros2 bag play {bag_file}", interactive=True)
+
+@cli.group()
+def service():
+    """Commands for interacting with ROS 2 services."""
+    pass
+
+@service.command("list")
+def service_list():
+    """List all active services."""
+    _run_sourcing_command("ros2 service list", interactive=False)
+
+@service.command("type")
+@click.argument("srv_name")
+def service_type(srv_name):
+    """Get the type of a service."""
+    _run_sourcing_command(f"ros2 service type {srv_name}", interactive=False)
+
+@service.command("info")
+@click.argument("srv_name")
+def service_info(srv_name):
+    """Get information about a specific service (shows type)."""
+    click.echo(f"Note: 'ros2 service info' does not exist. Showing type for '{srv_name}' instead.")
+    _run_sourcing_command(f"ros2 service type {srv_name}", interactive=False)
+
+@service.command("find")
+@click.argument("srv_type")
+def service_find(srv_type):
+    """Find services by service type."""
+    _run_sourcing_command(f"ros2 service find {srv_type}", interactive=False)
+
+@service.command("call", context_settings=dict(ignore_unknown_options=True))
+@click.argument("srv_name")
+@click.argument("srv_type")
+@click.argument("args", nargs=-1, type=click.UNPROCESSED)
+def service_call(srv_name, srv_type, args):
+    """Call a service with the given arguments."""
+    command = f"ros2 service call {srv_name} {srv_type} {' '.join(args)}"
+    _run_sourcing_command(command, interactive=True)
+
+@service.command("echo")
+@click.argument("srv_name")
+def service_echo(srv_name):
+    """Echo service requests (Not a standard ROS 2 command)."""
+    click.secho(f"Feature 'service echo' is not implemented. It requires a custom node to intercept and print requests.", err=True, fg="yellow")
+
+@cli.group()
+def action():
+    """Commands for interacting with ROS 2 actions."""
+    pass
+
+@action.command("list")
+def action_list():
+    """List all active actions."""
+    _run_sourcing_command("ros2 action list", interactive=False)
+
+@action.command("type")
+@click.argument("action_name")
+def action_type(action_name):
+    """Get the type of an action."""
+    click.echo(f"Note: 'ros2 action type' does not exist. Use 'ros2 action list -t' to see all types.")
+    _run_sourcing_command(f"ros2 action info {action_name}", interactive=False)
+
+@action.command("info")
+@click.argument("action_name")
+def action_info(action_name):
+    """Get information about a specific action."""
+    _run_sourcing_command(f"ros2 action info {action_name}", interactive=False)
+
+@action.command("send_goal", context_settings=dict(ignore_unknown_options=True))
+@click.argument("action_name")
+@click.argument("action_type")
+@click.argument("args", nargs=-1, type=click.UNPROCESSED)
+def action_send_goal(action_name, action_type, args):
+    """Send a goal to an action server."""
+    command = f"ros2 action send_goal {action_name} {action_type} {' '.join(args)}"
+    _run_sourcing_command(command, interactive=True)
+
+@action.command("echo")
+@click.argument("action_name")
+def action_echo(action_name):
+    """Echo action feedback and results (Not a standard ROS 2 command)."""
+    click.secho(f"Feature 'action echo' is not implemented. It requires a custom node to monitor the action.", err=True, fg="yellow")
+
+@cli.group()
+def param():
+    """Commands for interacting with ROS 2 parameters."""
+    pass
+
+@param.command("list")
+@click.argument("node_name", required=False)
+def param_list(node_name):
+    """List all parameters of all nodes, or one specific node."""
+    command = "ros2 param list"
+    if node_name:
+        command += f" {node_name}"
+    _run_sourcing_command(command, interactive=False)
+
+@param.command("get")
+@click.argument("node_name")
+@click.argument("param_name")
+def param_get(node_name, param_name):
+    """Get a parameter from a node."""
+    _run_sourcing_command(f"ros2 param get {node_name} {param_name}", interactive=False)
+
+@param.command("set")
+@click.argument("node_name")
+@click.argument("param_name")
+@click.argument("value")
+def param_set(node_name, param_name, value):
+    """Set a parameter on a node."""
+    _run_sourcing_command(f"ros2 param set {node_name} {param_name} {value}", interactive=True)
+
+@param.command("dump")
+@click.argument("node_name")
+def param_dump(node_name):
+    """Dump all parameters for a node to a file."""
+    _run_sourcing_command(f"ros2 param dump {node_name}", interactive=False)
+
+@param.command("load")
+@click.argument("node_name")
+@click.argument("file_path")
+def param_load(node_name, file_path):
+    """Load parameters for a node from a file."""
+    _run_sourcing_command(f"ros2 param load {node_name} {file_path}", interactive=True)
+
+@cli.group()
+def rqt():
+    """Launch RQT tools."""
+    pass
+
+@rqt.command("console")
+def rqt_console():
+    """Launch RQT Console."""
+    click.echo("Launching RQT Console...")
+    subprocess.Popen(["rqt_console"])
+
+@rqt.command("graph")
+def rqt_graph():
+    """Launch RQT Graph."""
+    click.echo("Launching RQT Graph...")
+    subprocess.Popen(["rqt_graph"])
+
 @cli.command()
 def doctor():
     """Checks the environment for potential issues and provides solutions."""
@@ -112,6 +386,17 @@ def doctor():
         click.echo("  Please ensure a ROS 2 distribution is installed and the ROS_DISTRO variable is set.")
     else:
         click.secho("[✓] ROS 2 environment sourcing is configured.", fg="green")
+
+    click.echo("\nChecking for missing dependencies (rosdep)...")
+    if os.path.isdir('src'):
+        rosdep_ok = _run_sourcing_command("rosdep install --from-paths src -y --ignore-src", interactive=True, exit_on_error=False)
+        if rosdep_ok:
+            click.secho("[✓] rosdep check complete.", fg="green")
+        else:
+            all_ok = False
+            click.secho("[X] rosdep check reported issues. Please check the output above.", fg="red")
+    else:
+        click.secho("[!] 'src' directory not found, skipping rosdep check.", fg="yellow")
 
     click.echo("-" * 40)
     if all_ok:
@@ -460,11 +745,23 @@ def generate_launch_description():
         f.write(boilerplate)
     click.secho(f"✓ Auto-generated default launch file: {default_launch_file}", fg="green")
 
-@cli.command(name='make:node')
+@cli.group("make")
+def make():
+    """Scaffold ROS 2 components."""
+    pass
+
+@make.command('node')
 @click.argument('node_name')
 @click.option('--pkg', 'pkg_name', required=True, help='The name of the package to add the node to.')
 def make_node(node_name, pkg_name):
     """Creates a new node file and registers it in an existing package."""
+    node_type = click.prompt(
+        'Select node type',
+        type=click.Choice(['Publisher', 'Subscriber', 'Service', 'ActionServer', 'Lifecycle'], case_sensitive=False),
+        default='Publisher'
+    )
+    click.echo(f"Scaffolding a '{node_type}' node named '{node_name}' in package '{pkg_name}'.")
+
     pkg_path = os.path.join('src', pkg_name)
     if not os.path.isdir(pkg_path):
         click.secho(f"Error: Package '{pkg_name}' not found at {pkg_path}", fg="red")
@@ -472,6 +769,10 @@ def make_node(node_name, pkg_name):
 
     # Convert node_name (e.g. my_awesome_node) to ClassName (e.g. MyAwesomeNode)
     class_name = "".join(word.capitalize() for word in node_name.split('_'))
+
+    if node_type.lower() != 'publisher':
+        click.secho(f"Scaffolding for node type '{node_type}' is not yet implemented.", fg="yellow")
+        click.secho("A default Publisher node will be created instead.", fg="yellow")
 
     # Determine package type and create node
     if os.path.exists(os.path.join(pkg_path, 'setup.py')):
@@ -588,7 +889,19 @@ int main(int argc, char * argv[])
 
     click.echo("\nRun 'genesys build' to make the new node available.")
 
-@cli.command(name='make:pkg')
+@make.command("interface")
+@click.argument('interface_name')
+@click.option('--pkg', 'pkg_name', required=True, help='The name of the package to add the interface to.')
+def make_interface(interface_name, pkg_name):
+    """Scaffold custom msg/srv/action files."""
+    click.secho(f"Scaffolding for interface '{interface_name}' in package '{pkg_name}' is not yet implemented.", fg="yellow")
+    click.echo("You will need to manually:")
+    click.echo("1. Place .msg/.srv/.action files under src/<pkg>/msg|srv|action/")
+    click.echo("2. Update package.xml with <build_depend>rosidl_default_generators</build_depend> and <exec_depend>rosidl_default_runtime</exec_depend>")
+    click.echo("3. Update CMakeLists.txt with find_package(rosidl_default_generators REQUIRED) and rosidl_generate_interfaces()")
+
+
+@make.command('pkg')
 @click.argument('package_name')
 @click.option('--with-node', is_flag=True, help='Create an initial node for the package.')
 @click.option('--dependencies', '-d', multiple=True, help='ROS 2 package dependencies.')
@@ -644,11 +957,12 @@ def make_pkg(ctx, package_name, with_node, dependencies):
     if with_node:
         ctx.invoke(make_node, node_name=f"{package_name}_node", pkg_name=package_name)
 
-@cli.command()
+@cli.command(context_settings=dict(ignore_unknown_options=True))
 @click.argument('launch_target', required=False)
 @click.option('--all', 'launch_all', is_flag=True, help='Launch the default.launch.py from all packages.')
+@click.argument('launch_args', nargs=-1, type=click.UNPROCESSED)
 @click.pass_context
-def launch(ctx, launch_target, launch_all):
+def launch(ctx, launch_target, launch_all, launch_args):
     """
     Launches ROS 2 nodes.
 
@@ -656,6 +970,7 @@ def launch(ctx, launch_target, launch_all):
     - genesys launch --all (launches default.launch.py from all packages)\n
     - genesys launch <pkg_name>:<launch_file.py>\n
     - genesys launch <pkg_name> (launches <pkg_name>_launch.py by default)
+    - You can pass launch arguments at the end, e.g., `log_level:=debug`
     """
     if launch_all and launch_target:
         click.secho("Error: Cannot use --all with a specific launch target.", fg="red")
@@ -752,6 +1067,8 @@ def launch(ctx, launch_target, launch_all):
 
         launch_command = f"ros2 launch {pkg_name} {launch_file}"
         command_to_run = source_prefix + launch_command
+        if launch_args:
+            command_to_run += " " + " ".join(launch_args)
 
         click.echo(f"Executing: {launch_command}")
 
@@ -765,10 +1082,15 @@ def launch(ctx, launch_target, launch_all):
         except Exception as e:
             click.secho(f"An error occurred during launch: {e}", fg="red")
 
-@cli.command()
+@cli.command(context_settings=dict(ignore_unknown_options=True))
 @click.argument('node_name')
-def run(node_name):
-    """Runs a ROS 2 node by its executable name, automatically finding the package."""
+@click.argument('args', nargs=-1, type=click.UNPROCESSED)
+def run(node_name, args):
+    """
+    Runs a ROS 2 node, automatically finding its package.
+
+    Supports simplified remapping, e.g.:\n
+    `genesys run <node_name> --remap <topic>:=<new_topic>`"""
     # 1. Verify we are in a workspace that has been built.
     if not os.path.isdir('install'):
         click.secho("Error: 'install' directory not found. Have you built the workspace yet?", fg="red")
@@ -818,17 +1140,38 @@ def run(node_name):
 
     click.echo(f"Found node '{node_name}' in package '{package_name}'. Starting node...")
 
-    # 5. Construct and run the final command.
-    run_command = f"ros2 run {package_name} {node_name}"
-    command_to_run = source_prefix + run_command
+    # 5. Construct and run the final command, processing remapping args.
+    run_command_parts = ["run", package_name, node_name]
+    
+    ros_args_to_add = []
+    other_args_to_add = []
+    
+    i = 0
+    while i < len(args):
+        arg = args[i]
+        if arg == '--remap':
+            if i + 1 < len(args):
+                ros_args_to_add.extend(['-r', args[i+1]])
+                i += 2
+            else: # ignore dangling --remap
+                i += 1
+        elif arg.startswith('--remap='):
+            ros_args_to_add.extend(['-r', arg.split('=', 1)[1]])
+            i += 1
+        else:
+            other_args_to_add.append(arg)
+            i += 1
+            
+    if ros_args_to_add:
+        run_command_parts.append('--ros-args')
+        run_command_parts.extend(ros_args_to_add)
+        
+    run_command_parts.extend(other_args_to_add)
 
     try:
-        # Use Popen to stream output and allow user to Ctrl+C the node.
-        process = subprocess.Popen(command_to_run, shell=True, executable=shell_exec)
-        process.wait()
+        _run_sourcing_command("ros2 " + " ".join(run_command_parts), interactive=True)
     except KeyboardInterrupt:
-        click.echo("\nNode execution interrupted by user.")
-        process.terminate()
+        click.echo("\nNode execution interrupted by user.") # Handled in helper
 
 @cli.command()
 @click.argument('world_file')
