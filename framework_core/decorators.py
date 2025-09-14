@@ -3,6 +3,7 @@ import inspect
 import rclpy
 from rclpy.node import Node
 from rclpy.qos import QoSProfile, QoSReliabilityPolicy, QoSHistoryPolicy
+from rclpy.action import ActionServer, ActionClient
 from rcl_interfaces.msg import SetParametersResult, ParameterDescriptor, ParameterType
 from rclpy.lifecycle import LifecycleNode, TransitionCallbackReturn
 
@@ -36,7 +37,7 @@ def _import_type_from_string(type_string: str):
     except (ImportError, AttributeError, IndexError) as e:
         raise ImportError(f"Could not import message type '{type_string}': {e}")
 
-# --- Placeholder object for parameters ---
+# --- Placeholder objects ---
 class Parameter:
     """
     A placeholder for a ROS 2 parameter that will be declared by the @node decorator.
@@ -52,6 +53,24 @@ class Parameter:
         e.g., in `scan_topic = parameter(...)`, name is 'scan_topic'.
         """
         self.attr_name = name
+
+class ActionClientPlaceholder:
+    """
+    A placeholder for a ROS 2 action client that will be created by the @node decorator.
+    """
+    def __init__(self, name, action_type):
+        self.name = name
+        self.action_type = action_type
+        self.attr_name = None  # This will be set by __set_name__
+
+    def __set_name__(self, owner, name):
+        """Captures the attribute name this instance is assigned to."""
+        self.attr_name = name
+
+def action_client(name, action_type):
+    """Defines a ROS 2 action client as a class attribute."""
+    # This is not a decorator, but a function that returns a placeholder
+    return ActionClientPlaceholder(name, action_type)
 
 def parameter(name, default_value=None):
     """
@@ -112,6 +131,37 @@ def timer(period_sec):
         return func
     return decorator
 
+def service(service_name, service_type):
+    """
+    Decorator to register a method as a ROS 2 service server callback.
+    """
+    def decorator(func):
+        if not hasattr(func, '_ros_services'):
+            func._ros_services = []
+        func._ros_services.append({'name': service_name, 'type': service_type})
+        return func
+    return decorator
+
+
+def action_server(action_name, action_type):
+    """
+    Decorator to register a method as a ROS 2 action server execute callback.
+    The decorated method must be a coroutine (async def).
+    """
+    def decorator(func):
+        if not hasattr(func, '_ros_action_servers'):
+            func._ros_action_servers = []
+        func._ros_action_servers.append({'name': action_name, 'type': action_type})
+        return func
+    return decorator
+
+def lifecycle_node(cls):
+    """
+    Class decorator to explicitly mark a class as a Lifecycle Node.
+    This is an alternative to the automatic detection based on lifecycle hooks.
+    """
+    cls._is_lifecycle_node = True
+    return cls
 
 # --- The main orchestrator decorator ---
 def node(node_name):
@@ -132,6 +182,8 @@ def node(node_name):
                 self._managed_publishers = []
                 self._managed_subscribers = []
                 self._managed_timers = []
+                self._managed_services = []
+                self._managed_action_servers = []
                 self._timer_definitions = []
 
             def _resolve_topic_or_service_name(self, name_arg):
@@ -182,6 +234,19 @@ def node(node_name):
 
                 self.add_on_set_parameters_callback(self._on_parameter_event)
 
+            def _initialize_action_clients(self):
+                self.get_logger().info("  -> Setting up action clients...")
+                for attr_name, placeholder in inspect.getmembers(user_cls):
+                    if isinstance(placeholder, ActionClientPlaceholder):
+                        resolved_name = self._resolve_topic_or_service_name(placeholder.name)
+                        action_type_class = placeholder.action_type
+                        if isinstance(action_type_class, str):
+                            action_type_class = _import_type_from_string(action_type_class)
+
+                        self.get_logger().info(f"     - Creating action client for '{attr_name}' on action '{resolved_name}'")
+                        client = ActionClient(self, action_type_class, resolved_name)
+                        setattr(self.user_instance, attr_name, client)
+
             def _initialize_communications(self):
                 self.get_logger().info("  -> Setting up communications...")
                 for name, method in inspect.getmembers(self.user_instance, predicate=inspect.ismethod):
@@ -189,7 +254,10 @@ def node(node_name):
                     timer_infos = getattr(original_func, '_ros_timers', None)
                     pub_infos = getattr(original_func, '_ros_publishers', None)
                     sub_infos = getattr(original_func, '_ros_subscribers', None)
-                    if not any([timer_infos, pub_infos, sub_infos]):
+                    srv_infos = getattr(original_func, '_ros_services', None)
+                    act_srv_infos = getattr(original_func, '_ros_action_servers', None)
+
+                    if not any([timer_infos, pub_infos, sub_infos, srv_infos, act_srv_infos]):
                         continue
                     callback_to_use = method
                     if pub_infos:
@@ -213,6 +281,29 @@ def node(node_name):
                                 return result
                             return wrapper
                         callback_to_use = create_publisher_wrapper(method, publishers)
+
+                    if srv_infos:
+                        for srv_info in srv_infos:
+                            resolved_name = self._resolve_topic_or_service_name(srv_info['name'])
+                            srv_type_class = srv_info['type']
+                            if isinstance(srv_type_class, str):
+                                srv_type_class = _import_type_from_string(srv_type_class)
+
+                            self.get_logger().info(f"     - Creating service for '{name}' on '{resolved_name}'")
+                            srv = self.create_service(srv_type_class, resolved_name, method)
+                            self._managed_services.append(srv)
+
+                    if act_srv_infos:
+                        for act_srv_info in act_srv_infos:
+                            resolved_name = self._resolve_topic_or_service_name(act_srv_info['name'])
+                            act_type_class = act_srv_info['type']
+                            if isinstance(act_type_class, str):
+                                act_type_class = _import_type_from_string(act_type_class)
+
+                            self.get_logger().info(f"     - Creating action server for '{name}' on '{resolved_name}'")
+                            act_srv = ActionServer(self, act_type_class, resolved_name, method)
+                            self._managed_action_servers.append(act_srv)
+
                     if sub_infos:
                         for sub_info in sub_infos:
                             resolved_topic = self._resolve_topic_or_service_name(sub_info['topic'])
@@ -261,11 +352,16 @@ def node(node_name):
                 for timer in self._managed_timers:
                     self.destroy_timer(timer)
                 self._managed_timers.clear()
+                for srv in self._managed_services:
+                    self.destroy_service(srv)
+                self._managed_services.clear()
+                # Action servers are managed by the node and don't need explicit destruction
+                self._managed_action_servers.clear()
                 self.get_logger().info("Cleanup complete.")
 
             def _call_user_hook(self, hook_name, *args):
                 """Helper to safely call a hook on the user's class instance."""
-                user_hook = getattr(self.user_instance, hook_name, None)
+                user_hook = getattr(self.user_instance, hook_name, None) 
                 if callable(user_hook):
                     self.get_logger().info(f"Executing user hook: {hook_name}")
                     try:
@@ -278,7 +374,7 @@ def node(node_name):
                 return TransitionCallbackReturn.SUCCESS
 
         # --- Detect if this should be a lifecycle node ---
-        is_lifecycle = any(hasattr(user_cls, hook) for hook in [
+        is_lifecycle = getattr(user_cls, '_is_lifecycle_node', False) or any(hasattr(user_cls, hook) for hook in [
             'on_configure', 'on_activate', 'on_deactivate', 'on_cleanup', 'on_shutdown', 'on_error'
         ])
 
@@ -292,6 +388,7 @@ def node(node_name):
                 def on_configure(self, state):
                     self.get_logger().info("on_configure() is called.")
                     self._initialize_parameters()
+                    self._initialize_action_clients()
                     self._initialize_communications()
                     if self._call_user_hook('on_configure', state) != TransitionCallbackReturn.SUCCESS:
                         self.get_logger().error("User's on_configure hook failed. Configuration aborted.")
@@ -355,6 +452,7 @@ def node(node_name):
                     self._init_logic(user_cls)
                     self.get_logger().info(f"Initializing Genesys node '{node_name}' for class '{user_cls.__name__}'...")
                     self._initialize_parameters()
+                    self._initialize_action_clients()
                     self._initialize_communications()
                     self.get_logger().info("Node initialization complete.")
             return GenesysNodeWrapper
