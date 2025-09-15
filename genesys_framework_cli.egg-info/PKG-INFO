@@ -1,6 +1,6 @@
 Metadata-Version: 2.4
 Name: genesys-framework-cli
-Version: 0.1.0
+Version: 0.1.1
 Summary: A developer-friendly, opinionated framework for ROS 2.
 Author: Genesys Developer
 Author-email: Chukwudulue Isaac <zikkychukwudulue@gmail.com>
@@ -32,16 +32,21 @@ The goal of Genesys is not to replace ROS 2, but to enhance it. It addresses com
 
 **Key Principle:** Every Genesys project remains a 100% valid ROS 2 project. You can always fall back to `colcon build` and `ros2 run` at any time.
 
+---
+
 ## Features
 
 -   **Unified CLI:** A single entry point (`genesys`) for all your development tasks.
 -   **Project Scaffolding:** Create a standardized workspace structure with `genesys new`.
--   **Interactive Code Generation:** Use `genesys make:pkg` and `genesys make:node` to interactively build packages and nodes with zero boilerplate.
+-   **Interactive Code Generation:** Use `genesys make pkg` and `genesys make node` to interactively build packages and nodes with zero boilerplate, now including **interactive selection for node types** like **publishers, subscribers, services, actions, and lifecycle nodes**.
 -   **Automated Build & Sourcing:** `genesys build` handles `colcon` and environment sourcing automatically.
 -   **Simplified Execution:** Run nodes by name with `genesys run <node_name>` or launch entire packages with `genesys launch <pkg_name>`.
 -   **One-Command Simulation:** Launch Gazebo with your world and robot model using `genesys sim <world_file>`.
 -   **Decorator-Based API:** A clean, declarative way to define ROS 2 components in Python.
--   **Environment Doctor:** A simple command (`genesys doctor`) to check if your environment is configured correctly.
+-   **Expanded Tooling:** Provides a suite of commands for common ROS 2 tasks, from listing nodes and topics to managing parameters and debugging.
+-   **Environment Doctor:** A simple command (`genesys doctor`) to check if your environment is configured correctly, including a check for missing dependencies via `rosdep`.
+
+---
 
 ## Installation
 
@@ -54,7 +59,13 @@ The goal of Genesys is not to replace ROS 2, but to enhance it. It addresses com
     ```bash
     pip install -e .
     ```
-    This installs the `genesys` command in "editable" mode, so any changes you make to the source code are immediately reflected.
+    OR
+    Install without cloning the repo
+    ```bash
+    pip install genesys-framework-cli==0.1.0
+    ```
+    
+    This installs the `genesys` command 
 
     # Make the command available immediately
     export PATH="$(python3 -m site --user-base)/bin:$PATH"
@@ -70,6 +81,8 @@ The goal of Genesys is not to replace ROS 2, but to enhance it. It addresses com
     ```
     If all checks pass, you're ready to go!
 
+---
+
 ## Quickstart: Your First Project
 
 This workflow demonstrates the "happy path" for creating a new project from scratch.
@@ -82,9 +95,9 @@ This workflow demonstrates the "happy path" for creating a new project from scra
     This creates a standard directory structure (`src/`, `launch/`, `config/`, etc.).
 
 2.  **Create a package with a node:**
-    The interactive wizard will guide you through the process.
+    The interactive wizard will guide you through the process, prompting you to select the node type (e.g., Publisher, Subscriber, etc.).
     ```bash
-    genesys make:pkg demo_pkg --with-node
+    genesys make pkg demo_pkg --with-node
     ```
     This generates `src/demo_pkg`, including `package.xml`, `setup.py`, a node file `demo_pkg/demo_pkg_node.py`, and auto-generates a corresponding launch file.
 
@@ -100,23 +113,51 @@ This workflow demonstrates the "happy path" for creating a new project from scra
     ```
     Genesys finds which package the node belongs to and executes `ros2 run demo_pkg demo_pkg_node` under the hood.
 
+---
+
 ## Command Reference
 
+### Workspace & Project Management
 | Command | Description |
 | ----------------------------------------- | -------------------------------------------------------------------------------------- |
 | `genesys new <project_name>` | Creates a new, structured ROS 2 workspace. |
-| `genesys make:pkg <pkg_name>` | Interactively creates a new Python or C++ package in `src/`. |
-| `genesys make:node <node_name> --pkg <pkg>` | Creates a new node and registers it within an existing package. |
+| `genesys make pkg <pkg_name>` | Interactively creates a new Python or C++ package in `src/`. |
+| `genesys make node <node_name> --pkg <pkg>` | Creates a new node with interactive type selection and registers it within an existing package. |
+| `genesys make interface` | Scaffolds custom message, service, and action files. |
 | `genesys build` | Builds the entire workspace using `colcon` and sources the environment. |
+
+### Execution & Simulation
+| Command | Description |
+| ----------------------------------------- | -------------------------------------------------------------------------------------- |
 | `genesys run <node_name>` | Runs a node by its executable name without needing the package name. |
 | `genesys launch <pkg>[:<file>]` | Launches a package's default launch file or a specific one. |
 | `genesys launch --all` | Launches the `default.launch.py` from all packages in the workspace. |
-| `genesys sim <world_file>` | Starts a Gazebo simulation with the specified world and a robot model from `sim/models`. |
+| `genesys sim <world_file>` | Starts a Gazebo simulation with the specified world and a robot model. |
+
+### ROS 2 Tooling
+| Command | Description |
+| ----------------------------------------- | -------------------------------------------------------------------------------------- |
+| `genesys node list` | Lists all active nodes. (Equivalent to `ros2 node list`) |
+| `genesys node info <node>` | Displays information about a specific node. (Equivalent to `ros2 node info`) |
+| `genesys topic list` | Lists all active topics. |
+| `genesys topic info <topic>` | Displays information about a topic. |
+| `genesys topic echo <topic>` | Prints messages from a topic to the console. |
+| `genesys topic pub <topic> <msg_type> <args>` | Publishes a message to a topic from the CLI. |
+| `genesys service list` | Lists all active services. |
+| `genesys service call <srv_name> <srv_type> <args>` | Calls a service from the CLI. |
+| `genesys param list` | Lists parameters for a node. |
+| `genesys param get <node> <param>` | Gets a parameter value from a node. |
+| `genesys param set <node> <param> <value>` | Sets a parameter value on a node. |
+| `genesys param dump` | Dumps all parameters from a node to a file. |
+| `genesys debug record <topics>` | Records data from specified topics. |
+| `genesys debug replay <file>` | Replays recorded data from a `.db3` file. |
 | `genesys doctor` | Checks for common environment and configuration issues. |
+
+---
 
 ## The Genesys Way: Decorators & Auto-generation
 
-Genesys dramatically reduces boilerplate by using Python decorators to define ROS 2 constructs. When you create a node with `make:node`, it comes pre-filled with a working example.
+Genesys dramatically reduces boilerplate by using Python decorators to define ROS 2 constructs. When you create a node with `make node`, it comes pre-filled with a working example.
 
 #### Example: A Simple Publisher Node
 
@@ -148,9 +189,9 @@ def main(args=None):
 
 if __name__ == '__main__':
     main()
-```
+````
 
-When you run `genesys make:node` or `genesys build`, the framework:
+When you run `genesys make node` or `genesys build`, the framework:
 
 1.  **Scans** for these decorators.
 2.  **Auto-registers** `my_talker_node` as an executable in `setup.py`.
@@ -184,3 +225,16 @@ def main(args=None):
 
 if __name__ == '__main__':
     main()
+```
+
+### New Decorators
+
+In addition to the ones above, Genesys introduces new decorators for advanced ROS 2 concepts, further reducing boilerplate:
+
+  - `@lifecycle_node`: Defines a ROS 2 Lifecycle Node and handles the state callbacks (`on_configure`, `on_activate`, etc.).
+  - `@service`: Registers a service server and automatically handles requests and responses.
+  - `@action_server`: Registers an action server with support for feedback and result generation.
+  - `@parameter`: Defines a node parameter, automatically loading values from a YAML config file and injecting them.
+
+<!-- end list -->
+
