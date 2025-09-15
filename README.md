@@ -104,7 +104,7 @@ This workflow demonstrates the "happy path" for creating a new project from scra
 | `genesys new <project_name>` | Creates a new, structured ROS 2 workspace. |
 | `genesys make pkg <pkg_name>` | Interactively creates a new Python or C++ package in `src/`. |
 | `genesys make node <node_name> --pkg <pkg>` | Creates a new node with interactive type selection and registers it within an existing package. |
-| `genesys make:interface` | Scaffolds custom message, service, and action files. |
+| `genesys make interface` | Scaffolds custom message, service, and action files. |
 | `genesys build` | Builds the entire workspace using `colcon` and sources the environment. |
 
 ### Execution & Simulation
@@ -219,5 +219,3 @@ In addition to the ones above, Genesys introduces new decorators for advanced RO
 
 <!-- end list -->
 
-```
-```
