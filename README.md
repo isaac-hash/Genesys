@@ -1,4 +1,3 @@
-````markdown
 # Genesys: An Opinionated ROS 2 Framework
 
 Genesys is a developer-friendly, opinionated framework for ROS 2 designed to reduce boilerplate, streamline common workflows, and provide a "happy path" for robotics development. It wraps the powerful but sometimes verbose ROS 2 toolchain in a single, intuitive CLI, allowing you to focus on logic, not setup.
