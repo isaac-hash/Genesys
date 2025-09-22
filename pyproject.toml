@@ -3,8 +3,8 @@ requires = ["setuptools>=61.0"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "genesys-framework-cli"
-version = "0.1.1"
+name = "genesys"
+version = "0.1.2"
 authors = [
   { name="Chukwudulue Isaac", email="zikkychukwudulue@gmail.com" },
 ]
