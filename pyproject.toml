@@ -21,7 +21,7 @@ dependencies = [
 ]
 
 [project.scripts]
-genesys = "framework_cli.main:cli"
+genesys = "genesys_cli.main:cli"
 
 [project.urls]
 Homepage = "https://github.com/isaac-hash/Genesys.git"

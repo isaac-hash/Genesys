@@ -3,7 +3,7 @@ from setuptools import setup, find_packages
 setup(
     name='genesys-framework-cli',
     version='0.1.1',
-    # find_packages() will automatically discover `framework_cli` and `framework_core`
+    # find_packages() will automatically discover `genesys_cli` and `genesys`
     packages=find_packages(),
     install_requires=[
         'click',
@@ -12,7 +12,7 @@ setup(
     entry_points={
         'console_scripts': [
             # This creates the `genesys` command and points it to your main function
-            'genesys = framework_cli.main:cli',
+            'genesys = genesys_cli.main:cli',
         ],
     },
     author='Genesys Developer',
