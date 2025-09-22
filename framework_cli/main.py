@@ -1320,7 +1320,8 @@ def run(node_name, args):
 @cli.command()
 @click.argument('world_file')
 def sim(world_file):
-    """Launches a simulation with a specified world file and robot model."""
+    """Launches a simulation with a specified world file and robot models (supports multiple URDF/SDF, namespaced)."""
+
     # 1. Verify workspace state
     if not os.path.isdir('install'):
         click.secho("Error: 'install' directory not found. Have you built the workspace yet?", fg="red")
@@ -1338,28 +1339,24 @@ def sim(world_file):
         click.secho(f"Error: World file not found: {world_path}", fg="red")
         sys.exit(1)
 
-    # 2. Find robot model in sim/models
+    # 2. Find robot models in sim/models
     sim_models_dir = 'sim/models'
-    robot_model_path = None
+    robot_models = []
     if os.path.isdir(sim_models_dir):
         for file in os.listdir(sim_models_dir):
-            if file.endswith(('.urdf', '.sdf')):
-                robot_model_path = os.path.join(sim_models_dir, file)
-                click.echo(f"Found robot model: {robot_model_path}")
-                break
+            if file.endswith(('.urdf', '.xacro', '.sdf')):
+                model_path = os.path.join(sim_models_dir, file)
+                robot_models.append(model_path)
+                click.echo(f"Found robot model: {model_path}")
 
-    if not robot_model_path:
-        click.secho("Warning: No robot model (.urdf or .sdf) found in 'sim/models/'.", fg="yellow")
-        click.secho("Gazebo will be launched without a robot.", fg="yellow")
+    if not robot_models:
+        click.secho("Warning: No robot models (.urdf/.xacro/.sdf) found in 'sim/models/'.", fg="yellow")
+        click.secho("Gazebo will be launched without robots.", fg="yellow")
 
     # 3. Generate temporary launch file
     import tempfile
     workspace_root_abs = os.getcwd()
     world_path_abs = os.path.join(workspace_root_abs, world_path)
-
-    robot_model_path_abs = None
-    if robot_model_path:
-        robot_model_path_abs = os.path.join(workspace_root_abs, robot_model_path)
 
     launch_content_parts = [
         "import os",
@@ -1372,21 +1369,58 @@ def sim(world_file):
         "def generate_launch_description():",
         "    pkg_gazebo_ros = get_package_share_directory('gazebo_ros')",
         f"    world_path = '{world_path_abs}'",
-        "    gzserver_cmd = IncludeLaunchDescription(PythonLaunchDescriptionSource(os.path.join(pkg_gazebo_ros, 'launch', 'gzserver.launch.py')), launch_arguments={'world': world_path, 'verbose': 'true'}.items())",
-        "    gzclient_cmd = IncludeLaunchDescription(PythonLaunchDescriptionSource(os.path.join(pkg_gazebo_ros, 'launch', 'gzclient.launch.py')))",
+        "    gzserver_cmd = IncludeLaunchDescription(",
+        "        PythonLaunchDescriptionSource(os.path.join(pkg_gazebo_ros, 'launch', 'gzserver.launch.py')),", 
+        "        launch_arguments={'world': world_path, 'verbose': 'true'}.items()",
+        "    )",
+        "    gzclient_cmd = IncludeLaunchDescription(",
+        "        PythonLaunchDescriptionSource(os.path.join(pkg_gazebo_ros, 'launch', 'gzclient.launch.py'))",
+        "    )",
         "    ld = LaunchDescription([gzserver_cmd, gzclient_cmd])",
     ]
 
-    if robot_model_path_abs:
-        robot_name = os.path.splitext(os.path.basename(robot_model_path_abs))[0]
-        launch_content_parts.extend([
-            f"    with open('{robot_model_path_abs}', 'r') as infp:",
-            "        robot_desc = infp.read()",
-            "    robot_state_publisher_node = Node(package='robot_state_publisher', executable='robot_state_publisher', output='screen', parameters=[{'robot_description': robot_desc, 'use_sim_time': True}])",
-            f"    spawn_entity_node = Node(package='gazebo_ros', executable='spawn_entity.py', arguments=['-entity', '{robot_name}', '-topic', 'robot_description'], output='screen')",
-            "    ld.add_action(robot_state_publisher_node)",
-            "    ld.add_action(spawn_entity_node)",
-        ])
+    for idx, model_path in enumerate(robot_models, start=1):
+        abs_model_path = os.path.join(workspace_root_abs, model_path)
+        ext = os.path.splitext(abs_model_path)[1].lower()
+        base_name = os.path.splitext(os.path.basename(abs_model_path))[0]
+
+        # Namespace for this robot (robot1, robot2, ...)
+        ns = f"robot{idx}"
+        robot_name = f"{base_name}_{ns}"
+
+        if ext in [".urdf", ".xacro"]:
+            launch_content_parts.extend([
+                f"    with open('{abs_model_path}', 'r') as infp:",
+                "        robot_desc = infp.read()",
+                f"    robot_state_publisher_node_{ns} = Node(",
+                "        package='robot_state_publisher',",
+                "        executable='robot_state_publisher',",
+                "        output='screen',",
+                f"        namespace='{ns}',",
+                "        parameters=[{'robot_description': robot_desc, 'use_sim_time': True}]",
+                "    )",
+                f"    spawn_entity_node_{ns} = Node(",
+                "        package='gazebo_ros',",
+                "        executable='spawn_entity.py',",
+                f"        arguments=['-entity', '{robot_name}', '-topic', 'robot_description'],",
+                f"        namespace='{ns}',",
+                "        output='screen'",
+                "    )",
+                f"    ld.add_action(robot_state_publisher_node_{ns})",
+                f"    ld.add_action(spawn_entity_node_{ns})",
+            ])
+
+        elif ext == ".sdf":
+            launch_content_parts.extend([
+                f"    spawn_entity_node_{ns} = Node(",
+                "        package='gazebo_ros',",
+                "        executable='spawn_entity.py',",
+                f"        arguments=['-entity', '{robot_name}', '-file', '{abs_model_path}'],",
+                f"        namespace='{ns}',",
+                "        output='screen'",
+                "    )",
+                f"    ld.add_action(spawn_entity_node_{ns})",
+            ])
 
     launch_content_parts.append("    return ld")
     launch_content = "\n".join(launch_content_parts)
@@ -1402,8 +1436,9 @@ def sim(world_file):
         click.echo(f"Executing: ros2 launch {os.path.basename(temp_launch_file)}")
         process = subprocess.Popen(command_to_run, shell=True, executable=shell_exec)
         click.secho("\n✓ Simulation is starting...", fg="cyan")
-        if robot_model_path:
-            click.echo("  Run your robot's control and logic nodes in a separate, sourced terminal (e.g., 'genesys launch <pkg_name>').")
+        if robot_models:
+            click.echo(f"  {len(robot_models)} robot(s) have been spawned with namespaces /robot1, /robot2, ...")
+            click.echo("  Run control/logic nodes in the correct namespace (e.g., `ros2 run pkg node --ros-args -r __ns:=/robot1`).")
         process.wait()
     except KeyboardInterrupt:
         click.echo("\nSimulation interrupted by user.")
