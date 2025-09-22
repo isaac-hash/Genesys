@@ -3,11 +3,11 @@ NOTICE.txt
 README.md
 pyproject.toml
 setup.py
+genesys/__init__.py
+genesys/decorators.py
+genesys/helpers.py
 genesys_cli/__init__.py
 genesys_cli/main.py
-framework_core/__init__.py
-framework_core/decorators.py
-framework_core/helpers.py
 genesys_framework_cli.egg-info/PKG-INFO
 genesys_framework_cli.egg-info/SOURCES.txt
 genesys_framework_cli.egg-info/dependency_links.txt
