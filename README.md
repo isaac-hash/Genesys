@@ -143,8 +143,8 @@ Genesys dramatically reduces boilerplate by using Python decorators to define RO
 #### Example: A Simple Publisher Node
 
 ```python
-from framework_core.decorators import node, timer, publisher
-from framework_core.helpers import spin_node
+from genesys.decorators import node, timer, publisher
+from genesys.helpers import spin_node
 from std_msgs.msg import String
 
 @node("my_talker_node")
@@ -183,8 +183,8 @@ This means your node is ready to run immediately without manually editing any bu
 #### Example: A Simple Subscriber Node
 
 ```python
-from framework_core.decorators import node, subscriber
-from framework_core.helpers import spin_node
+from genesys.decorators import node, subscriber
+from genesys.helpers import spin_node
 from std_msgs.msg import String
 
 @node("my_listener_node")
@@ -218,4 +218,3 @@ In addition to the ones above, Genesys introduces new decorators for advanced RO
   - `@parameter`: Defines a node parameter, automatically loading values from a YAML config file and injecting them.
 
 <!-- end list -->
-

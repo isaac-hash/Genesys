@@ -775,8 +775,8 @@ def make_node(node_name, pkg_name):
 
     # --- Boilerplate Definitions ---
     if node_type_lower == 'publisher':
-        boilerplate = f"""from framework_core.decorators import node, timer, publisher
-from framework_core.helpers import spin_node
+        boilerplate = f"""from genesys.decorators import node, timer, publisher
+from genesys.helpers import spin_node
 from std_msgs.msg import String
 
 @node("{node_name}")
@@ -805,8 +805,8 @@ class {class_name}:
         return msg
 """
     elif node_type_lower == 'subscriber':
-        boilerplate = f"""from framework_core.decorators import node, subscriber
-from framework_core.helpers import spin_node
+        boilerplate = f"""from genesys.decorators import node, subscriber
+from genesys.helpers import spin_node
 from std_msgs.msg import String
 
 @node("{node_name}")
@@ -826,8 +826,8 @@ class {class_name}:
         self.logger.info(f'I heard: "{{msg.data}}"')
 """
     elif node_type_lower == 'service':
-        boilerplate = f"""from framework_core.decorators import node, service
-from framework_core.helpers import spin_node
+        boilerplate = f"""from genesys.decorators import node, service
+from genesys.helpers import spin_node
 from example_interfaces.srv import AddTwoInts
 
 @node("{node_name}")
@@ -850,8 +850,8 @@ class {class_name}:
 """
     elif node_type_lower == 'actionserver':
         boilerplate = f"""import asyncio
-from framework_core.decorators import node, action_server
-from framework_core.helpers import spin_node
+from genesys.decorators import node, action_server
+from genesys.helpers import spin_node
 from action_tutorials_interfaces.action import Fibonacci
 
 @node("{node_name}")
@@ -891,8 +891,8 @@ class {class_name}:
         return result
 """
     elif node_type_lower == 'lifecycle':
-        boilerplate = f"""from framework_core.decorators import node, lifecycle_node, timer, publisher
-from framework_core.helpers import spin_node
+        boilerplate = f"""from genesys.decorators import node, lifecycle_node, timer, publisher
+from genesys.helpers import spin_node
 from rclpy.lifecycle import TransitionCallbackReturn
 from std_msgs.msg import String
 

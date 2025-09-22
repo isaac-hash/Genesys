@@ -3,8 +3,8 @@ NOTICE.txt
 README.md
 pyproject.toml
 setup.py
-framework_cli/__init__.py
-framework_cli/main.py
+genesys_cli/__init__.py
+genesys_cli/main.py
 framework_core/__init__.py
 framework_core/decorators.py
 framework_core/helpers.py
