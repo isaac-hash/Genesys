@@ -1339,18 +1339,36 @@ def sim(world_file):
         click.secho(f"Error: World file not found: {world_path}", fg="red")
         sys.exit(1)
 
-    # 2. Find robot models in sim/models
+        # 2. Find robot models in sim/models
+    import xml.etree.ElementTree as ET
+
+    def is_valid_robot_model(path: str) -> bool:
+        """Check if the XML root is <sdf> or <robot> (valid for ROS2 spawn_entity)."""
+        try:
+            tree = ET.parse(path)
+            root = tree.getroot().tag.lower()
+            return root in ("sdf", "robot")
+        except Exception:
+            return False
+
     sim_models_dir = 'sim/models'
     robot_models = []
     if os.path.isdir(sim_models_dir):
         for file in os.listdir(sim_models_dir):
             if file.endswith(('.urdf', '.xacro', '.sdf')):
                 model_path = os.path.join(sim_models_dir, file)
-                robot_models.append(model_path)
-                click.echo(f"Found robot model: {model_path}")
+
+                if is_valid_robot_model(model_path):
+                    robot_models.append(model_path)
+                    click.echo(f"Found robot model: {model_path}")
+                else:
+                    click.secho(
+                        f"⚠️  Skipping {model_path} (not a valid URDF/SDF root element for ROS2)",
+                        fg="yellow"
+                    )
 
     if not robot_models:
-        click.secho("Warning: No robot models (.urdf/.xacro/.sdf) found in 'sim/models/'.", fg="yellow")
+        click.secho("Warning: No valid robot models (.urdf/.xacro/.sdf) found in 'sim/models/'.", fg="yellow")
         click.secho("Gazebo will be launched without robots.", fg="yellow")
 
     # 3. Generate temporary launch file
