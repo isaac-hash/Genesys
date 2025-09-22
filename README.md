@@ -43,7 +43,7 @@ The goal of Genesys is not to replace ROS 2, but to enhance it. It addresses com
     OR
     Install without cloning the repo
     ```bash
-    pip install genesys-framework-cli==0.1.1
+    pip install genesys-framework-cli
     ```
     
     This installs the `genesys` command 
