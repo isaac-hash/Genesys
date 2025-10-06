@@ -439,7 +439,8 @@ def new(project_name):
 
 @cli.command()
 @click.option('--packages', '-p', multiple=True, help='Specific packages to build. Builds all if not specified.')
-def build(packages):
+@click.option('--persist', is_flag=True, help='Add workspace sourcing to shell startup file (e.g., .bashrc).')
+def build(packages, persist):
     """Builds the entire workspace or specific packages."""
     # 1. Verify we are in a Genesys workspace root.
     if not os.path.isdir('src'):
@@ -450,7 +451,8 @@ def build(packages):
     click.echo("Building the workspace...")
 
     source_prefix, shell_exec = _get_sourcing_command(clean_env=True)
-    colcon_command = ['colcon', 'build', '--symlink-install']
+
+    colcon_command = ['colcon', 'build', '--symlink-install', '--cmake-clean-first']
     if packages:
         colcon_command.extend(['--packages-select'] + list(packages))
 
@@ -472,12 +474,59 @@ def build(packages):
         if process.returncode == 0:
             click.secho("\n✓ Build completed successfully.", fg="green")
             click.echo("To use the new executables, you may need to source the workspace or start a new terminal.")
+            if persist:
+                _persist_workspace_sourcing()
+            else:
+                click.echo("To use the new executables, you may need to source the workspace or start a new terminal.")
         else:
             raise subprocess.CalledProcessError(process.returncode, command_to_run)
 
     except subprocess.CalledProcessError as e:
         click.secho(f"\nBuild failed with exit code {e.returncode}.", fg="red")
         sys.exit(1)
+
+def _persist_workspace_sourcing():
+    """Appends the workspace sourcing command to the user's shell startup file."""
+    if not (sys.platform.startswith('linux') or sys.platform == 'darwin'):
+        click.secho("Warning: Persistent sourcing is only supported on Linux and macOS.", fg="yellow")
+        return
+
+    shell_path = os.environ.get("SHELL", "")
+    rc_file = None
+    if "zsh" in shell_path:
+        rc_file = os.path.expanduser("~/.zshrc")
+    elif "bash" in shell_path:
+        rc_file = os.path.expanduser("~/.bashrc")
+    else:
+        click.secho(f"Warning: Unsupported shell '{shell_path}' for persistent sourcing. Please add sourcing manually.", fg="yellow")
+        return
+
+    workspace_path = os.getcwd()
+    setup_script_path = os.path.join(workspace_path, 'install', 'setup.bash')
+    
+    if not os.path.exists(setup_script_path):
+        click.secho(f"Error: Build seems to have finished, but '{setup_script_path}' not found. Cannot persist sourcing.", fg="red")
+        return
+
+    source_line = f"source {setup_script_path}"
+    comment_line = f"# Sourced by Genesys CLI for workspace: {workspace_path}"
+    
+    try:
+        # Idempotency check: only add if the line is not already present.
+        if os.path.exists(rc_file):
+            with open(rc_file, 'r') as f:
+                if source_line in f.read():
+                    click.secho(f"✓ Sourcing for this workspace already exists in {os.path.basename(rc_file)}.", fg="green")
+                    return
+        
+        # Safety: Append to the file, never overwrite.
+        with open(rc_file, 'a') as f:
+            f.write(f"\n{comment_line}\n{source_line}\n")
+        
+        click.secho(f"✓ Workspace sourcing added to {os.path.basename(rc_file)}.", fg="green")
+        click.echo("  Please open a new terminal session for the changes to take effect.")
+    except Exception as e:
+        click.secho(f"Error: Failed to write to {rc_file}: {e}", fg="red")
 
 def _add_python_entry_point(pkg_name, node_name):
     """Adds a new console_script entry to a package's setup.py file."""
