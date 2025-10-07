@@ -1,2 +1,3 @@
 [console_scripts]
 genesys = genesys_cli.main:cli
+
