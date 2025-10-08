@@ -264,8 +264,8 @@ def add_node_to_launch(pkg_name, node_name):
     # Regex: insert before the closing ] of LaunchDescription([...])
     updated_content = re.sub(
         r"(\s*)\]\)", # Find the closing bracket and parenthesis of LaunchDescription([...])
-        f",\n{new_node_block}\n    ])", # Add a comma, the new node, and the closing syntax
-        content
+        f"\n{new_node_block}\n    ])", # Add the new node and the closing syntax
+        content,
         count=1 # Only replace the first occurrence to avoid issues with nested LaunchDescriptions
     )
 
