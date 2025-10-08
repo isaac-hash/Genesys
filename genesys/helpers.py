@@ -33,8 +33,21 @@ def spin_node(node_class, args=None):
 
     except (KeyboardInterrupt, ExternalShutdownException):
         pass
+    # finally:
+    #     if node_instance and node_instance.context.is_valid():
+    #         node_instance.destroy_node()
+    #     if rclpy.ok():
+    #         rclpy.shutdown()
+    # finally:
+    #     if node_instance is not None:
+    #         node_instance.destroy_node()
+    #     if rclpy.ok():
+    #         rclpy.shutdown()
     finally:
-        if node_instance and node_instance.context.is_valid():
-            node_instance.destroy_node()
+        if node_instance is not None:
+            try:
+                node_instance.destroy_node()
+            except Exception:
+                pass
         if rclpy.ok():
             rclpy.shutdown()
