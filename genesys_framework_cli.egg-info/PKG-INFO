@@ -1,14 +1,16 @@
-Metadata-Version: 2.1
+Metadata-Version: 2.4
 Name: genesys-framework-cli
-Version: 0.1.1
+Version: 0.1.3
 Summary: A developer-friendly, opinionated framework for ROS 2.
-Home-page: UNKNOWN
 Author: Genesys Developer
 Author-email: dev@genesys.ros
 License: Apache 2.0
-Platform: UNKNOWN
 License-File: LICENSE.txt
 License-File: NOTICE.txt
-
-UNKNOWN
-
+Requires-Dist: click
+Dynamic: author
+Dynamic: author-email
+Dynamic: license
+Dynamic: license-file
+Dynamic: requires-dist
+Dynamic: summary

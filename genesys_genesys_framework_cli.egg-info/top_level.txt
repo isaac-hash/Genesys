@@ -1,3 +1,0 @@
-dist
-genesys
-genesys_cli
