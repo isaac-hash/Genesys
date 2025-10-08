@@ -1,6 +1,7 @@
 LICENSE.txt
 NOTICE.txt
 README.md
+pyproject.toml
 setup.py
 genesys/__init__.py
 genesys/decorators.py

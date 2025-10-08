@@ -86,7 +86,7 @@ This workflow demonstrates the "happy path" for creating a new project from scra
     ```bash
     genesys build
     ```
-    This runs `colcon build --symlink-install` and sources the environment for you. The `demo_pkg_node` is now a runnable executable.
+    This runs `colcon build --symlink-install --cmake-clean-first` and sources the environment for you, with an optional '--persist' flag that ensures the sourcing is permanent so you can open a new terminal without sourcing again or running the build command again. The `demo_pkg_node` is now a runnable executable.
 
 4.  **Run your node:**
     ```bash

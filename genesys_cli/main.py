@@ -15,6 +15,7 @@ def cli():
     """Genesys CLI for ROS 2 workspace management."""
     pass
 
+
 # Add commands to the main CLI group
 cli.add_command(build)
 cli.add_command(doctor)
