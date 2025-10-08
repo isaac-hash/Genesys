@@ -182,6 +182,9 @@ def node(node_name):
                 # Inject the logger before calling the user's constructor
                 self.user_instance.logger = self.get_logger()
 
+                # Inject other common Node methods
+                self.user_instance.get_clock = self.get_clock
+
                 # Now, call the user's constructor
                 self.user_instance.__init__()
                 self._param_to_attr_map = {}
