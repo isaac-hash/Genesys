@@ -248,7 +248,7 @@ def add_node_to_launch(pkg_name, node_name):
     with open(launch_file, 'r') as f:
         content = f.read()
 
-    # Build the new Node block (with trailing comma!)
+    # Build the new Node block (with a trailing comma, as per the original design)
     new_node_block = f"""        Node(
             package='{pkg_name}',
             executable='{node_name}',
@@ -261,23 +261,16 @@ def add_node_to_launch(pkg_name, node_name):
         click.secho(f"Launch file already contains '{node_name}'.", fg="yellow")
         return
 
-    # Find the last occurrence of a Node definition to insert after it.
-    # This regex finds a complete `Node(...)` block.
-    # We use re.DOTALL so `.` matches newlines.
-    matches = list(re.finditer(r"Node\s*\(.*?\),?", content, re.DOTALL))
-
-    if matches:
-        last_match = matches[-1]
-        insertion_point = last_match.end()
-        
-        # Add a comma to the end of the last node if it doesn't have one
-        prefix = "" if last_match.group().strip().endswith(',') else ","
-        
-        updated_content = content[:insertion_point] + prefix + "\n" + new_node_block + content[insertion_point:]
-    else:
-        # This case should ideally not be hit if add_launch_file_boilerplate works, but it's a safe fallback.
-        # It inserts the node into an empty LaunchDescription([])
-        updated_content = re.sub(r"LaunchDescription\(\[", f"LaunchDescription([\n{new_node_block}", content, count=1)
+    # This regex finds the closing bracket and parenthesis of the LaunchDescription list.
+    # It inserts the new node block just before it.
+    # The key change from the original `org.txt` is removing the `$` anchor,
+    # so it works even if `])` is not at the very end of the file.
+    updated_content = re.sub(
+        r"(\s*)\]\)",  # Find the closing bracket and parenthesis
+        f",\n{new_node_block}\n    ])",  # Add a comma, the new node, and the closing syntax
+        content,
+        count=1
+    )
 
     with open(launch_file, 'w') as f:
         f.write(updated_content)
