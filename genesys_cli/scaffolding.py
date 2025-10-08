@@ -74,27 +74,23 @@ def add_python_entry_point(pkg_name, node_name):
         return
 
 
-    new_entry = f"'{node_name} = {pkg_name}.{node_module_name}:main'"
+    # Always add a comma at the end for consistency, making it easier to append new entries.
+    new_entry = f"'{node_name} = {pkg_name}.{node_module_name}:main',"
 
-    # Find the last non-empty line in the scripts block
-    lines = [line for line in scripts_content.split('\n') if line.strip()]
+    # Determine indentation from the line before the closing bracket
+    pre_match_line_start = content.rfind('\n', 0, match.end('scripts')) + 1
+    indentation = " " * (match.start('scripts') - pre_match_line_start)
 
-    if lines:
-        # The list has existing entries.
-        last_line = lines[-1]
-        indentation = " " * (len(last_line) - len(last_line.lstrip()))
-        text_to_insert = ""
-        if not last_line.strip().endswith(','):
-            text_to_insert += ","
-        text_to_insert += f"\n{indentation}{new_entry}"
-        updated_content = content.replace(last_line, last_line + text_to_insert)
-    else:
-        # The list is empty.
-        pre_match_line_start = content.rfind('\n', 0, match.start('scripts')) + 1
-        indentation = " " * (match.start('scripts') - pre_match_line_start) + "    "
-        insertion = f"\n{indentation}{new_entry}\n"
-        insertion_point = match.end('scripts')
-        updated_content = content[:insertion_point] + insertion + content[insertion_point:]
+    # If the list is not empty, add a newline before the new entry.
+    if scripts_content.strip():
+        insertion = f"\n{indentation}{new_entry}"
+    else: # The list is empty, add indentation and newlines around it.
+        indentation += "    " # Add extra indent for the first item
+        insertion = f"\n{indentation}{new_entry}\n{indentation[:-4]}"
+
+    # Insert the new entry right before the closing bracket of the list.
+    insertion_point = match.end('scripts')
+    updated_content = content[:insertion_point] + insertion + content[insertion_point:]
 
     with open(setup_file, 'w') as f:
         f.write(updated_content)
@@ -232,7 +228,7 @@ def generate_launch_description():
             name='{node_name}',
             output='screen',
             emulate_tty=True
-        ),
+        )
     ])
 """
         with open(launch_file, 'w') as f:
@@ -248,25 +244,24 @@ def add_node_to_launch(pkg_name, node_name):
     with open(launch_file, 'r') as f:
         content = f.read()
 
-    # Build the new Node block (with trailing comma!)
-    new_node_block = f"""        Node(
+    # Build the new Node block (with a trailing comma, as per the original design)
+    new_node_block = f"""Node(
             package='{pkg_name}',
             executable='{node_name}',
             name='{node_name}',
             output='screen',
             emulate_tty=True
-        ),"""
+        )"""
 
-    if new_node_block in content:
+    if f"executable='{node_name}'" in content:
         click.secho(f"Launch file already contains '{node_name}'.", fg="yellow")
         return
 
-    # Regex: insert before the closing ] of LaunchDescription([...])
-    updated_content = re.sub(
-        r"(\s*)\]\)", # Find the closing bracket and parenthesis of LaunchDescription([...])
-        f"\n{new_node_block}\n    ])", # Add a comma, the new node, and the closing syntax
+    # Insert the new node block before the closing bracket of the LaunchDescription list.
+    updated_content = re.sub(r"(\s*)(\]\s*\))",  # Find the closing bracket and parenthesis
+        rf"\g<1>    {new_node_block}\n\g<1>\g<2>", # Indent and insert the new block
         content,
-        count=1 # Only replace the first occurrence to avoid issues with nested LaunchDescriptions
+        flags=re.MULTILINE
     )
 
     with open(launch_file, 'w') as f:
