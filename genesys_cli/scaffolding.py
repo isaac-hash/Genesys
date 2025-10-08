@@ -263,10 +263,10 @@ def add_node_to_launch(pkg_name, node_name):
 
     # Regex: insert before the closing ] of LaunchDescription([...])
     updated_content = re.sub(
-        r"(\s*)\]\s*$",
-        f"{new_node_block}\n    ])",
-        content,
-        flags=re.MULTILINE
+        r"(\s*)\]\)", # Find the closing bracket and parenthesis of LaunchDescription([...])
+        f",\n{new_node_block}\n    ])", # Add a comma, the new node, and the closing syntax
+        content
+        count=1 # Only replace the first occurrence to avoid issues with nested LaunchDescriptions
     )
 
     with open(launch_file, 'w') as f:
@@ -310,4 +310,3 @@ def generate_launch_description():
     with open(default_launch_file, 'w') as f:
         f.write(boilerplate)
     click.secho(f"✓ Auto-generated default launch file: {default_launch_file}", fg="green")
-

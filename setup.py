@@ -2,7 +2,7 @@ from setuptools import setup, find_packages
 
 setup(
     name='genesys-framework-cli',
-    version='0.1.1',
+    version='0.1.4',
     # find_packages() will automatically discover `genesys_cli` and `genesys`
     packages=find_packages(),
     install_requires=[

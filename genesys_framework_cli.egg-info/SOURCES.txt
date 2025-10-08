@@ -20,6 +20,7 @@ genesys_cli/commands/ros.py
 genesys_cli/commands/rqt.py
 genesys_cli/commands/run.py
 genesys_cli/commands/sim.py
+genesys_cli/commands/templates.py
 genesys_framework_cli.egg-info/PKG-INFO
 genesys_framework_cli.egg-info/SOURCES.txt
 genesys_framework_cli.egg-info/dependency_links.txt
