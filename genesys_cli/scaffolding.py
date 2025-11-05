@@ -228,7 +228,7 @@ def generate_launch_description():
             name='{node_name}',
             output='screen',
             emulate_tty=True
-        )
+        ),
     ])
 """
         with open(launch_file, 'w') as f:
@@ -251,7 +251,7 @@ def add_node_to_launch(pkg_name, node_name):
             name='{node_name}',
             output='screen',
             emulate_tty=True
-        )"""
+        ),"""
 
     if f"executable='{node_name}'" in content:
         click.secho(f"Launch file already contains '{node_name}'.", fg="yellow")
