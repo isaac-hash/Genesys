@@ -1,0 +1,54 @@
+#include "genesys/macros.hpp"
+#include "rclcpp_lifecycle/lifecycle_publisher.hpp"
+#include "std_msgs/msg/string.hpp"
+
+// Use GEN_LIFECYCLE_NODE to define the class.
+GEN_LIFECYCLE_NODE({{ class_name }}, "{{ node_name }}")
+{
+    // GEN_PUB works with lifecycle nodes too.
+    // The publisher will be a LifecyclePublisher and will be automatically
+    // activated and deactivated.
+    GEN_PUB(chatter, std_msgs::msg::String, rclcpp::QoS(10));
+
+    // GEN_TIMER is also supported.
+    GEN_TIMER(on_timer, 1000);
+
+private:
+    size_t count_ = 0;
+
+public:
+    // Timer callback
+    void on_timer()
+    {
+        auto message = std_msgs::msg::String();
+        message.data = "Hello from Genesys Lifecycle Node! #" + std::to_string(count_++);
+        RCLCPP_INFO(this->get_logger(), "Publishing: '%s'", message.data.c_str());
+
+        // Publish the message.
+        chatter(message);
+    }
+};
+
+// This helper macro implements the parameter setter method.
+GEN_SET_MEMBER_IMPL({{ class_name }})
+{
+    // No parameters in this example.
+}
+GEN_SET_MEMBER_END
+
+int main(int argc, char * argv[])
+{
+    // force flush of the stdout buffer.
+    setvbuf(stdout, NULL, _IONBF, BUFSIZ);
+
+    rclcpp::init(argc, argv);
+
+    rclcpp::executors::SingleThreadedExecutor exe;
+    auto node = std::make_shared<{{ class_name }}>();
+
+    exe.add_node(node->get_node_base_interface());
+    exe.spin();
+
+    rclcpp::shutdown();
+    return 0;
+}

@@ -2,13 +2,12 @@ from setuptools import setup, find_packages
 
 setup(
     name='genesys-framework-cli',
-
-    version='0.1.4',
-
+    version='0.1.5',
     # find_packages() will automatically discover `genesys_cli` and `genesys`
     packages=find_packages(),
     install_requires=[
         'click',
+        'Jinja2',
         # rclpy and other ROS packages are expected to be in the sourced environment
     ],
     entry_points={

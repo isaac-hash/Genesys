@@ -1,0 +1,208 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Genesis CLI Simulation Package Guardrail",
+  "description": "Guide for implementing 'genesis sim' CLI commands to create and run ROS 2 Gazebo simulation packages in the sim/ workspace.",
+  "type": "object",
+  "properties": {
+    "cli_commands": {
+      "type": "array",
+      "items": [
+        {
+          "type": "object",
+          "properties": {
+            "name": { "type": "string", "const": "genesis sim create" },
+            "description": { "type": "string", "const": "Creates a new *_gazebo package in sim/ for a robot." },
+            "arguments": {
+              "type": "object",
+              "properties": {
+                "package_name": {
+                  "type": "string",
+                  "pattern": "^[a-z0-9_]+_gazebo$",
+                  "description": "Name of the gazebo package (e.g., ur_gazebo)."
+                },
+                "from": {
+                  "type": "string",
+                  "pattern": "^[a-z0-9_]+(_description)?$",
+                  "description": "Source robot description package (e.g., ur_description)."
+                }
+              },
+              "required": ["package_name", "from"]
+            },
+            "behavior": {
+              "type": "object",
+              "properties": {
+                "output_path": { "type": "string", "const": "sim/<package_name>" },
+                "create_directories": {
+                  "type": "array",
+                  "items": { "type": "string" },
+                  "enum": ["launch", "config", "worlds", "models", "urdf", "plugins", "scripts"],
+                  "minItems": 7,
+                  "maxItems": 7
+                },
+                "create_files": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "path": { "type": "string" },
+                      "template": { "type": "string" },
+                      "description": { "type": "string" }
+                    },
+                    "required": ["path", "template"]
+                  },
+                  "enum": [
+                    {
+                      "path": "CMakeLists.txt",
+                      "template": "templates/gazebo/CMakeLists.txt.j2",
+                      "description": "CMake build file for the gazebo package."
+                    },
+                    {
+                      "path": "package.xml",
+                      "template": "templates/gazebo/package.xml.j2",
+                      "description": "ROS 2 package manifest."
+                    },
+                    {
+                      "path": "launch/<package_name>.launch.py",
+                      "template": "templates/gazebo/launch/main.launch.py.j2",
+                      "description": "Main launch file for Gazebo world + robot."
+                    },
+                    {
+                      "path": "launch/spawn_<robot_name>.launch.py",
+                      "template": "templates/gazebo/launch/spawn.launch.py.j2",
+                      "description": "Launch file to spawn the robot."
+                    },
+                    {
+                      "path": "config/controllers.yaml",
+                      "template": "templates/gazebo/config/controllers.yaml.j2",
+                      "description": "Controller configuration."
+                    },
+                    {
+                      "path": "worlds/empty.world",
+                      "template": "templates/gazebo/worlds/empty.world",
+                      "description": "Minimal Gazebo world file."
+                    }
+                  ]
+                },
+                "symlink": {
+                  "type": "object",
+                  "properties": {
+                    "target": { "type": "string", "const": "urdf" },
+                    "source": { "type": "string", "const": "../../<from>/urdf" }
+                  },
+                  "required": ["target", "source"]
+                },
+                "metadata": {
+                  "type": "object",
+                  "properties": {
+                    "file": { "type": "string", "const": "genesis.toml" },
+                    "content": {
+                      "type": "object",
+                      "properties": {
+                        "sim.packages": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "name": { "type": "string" },
+                              "description": { "type": "string" },
+                              "default_launch": { "type": "string" }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              },
+              "required": ["output_path", "create_directories", "create_files", "symlink", "metadata"]
+            }
+          }
+        },
+        {
+          "type": "object",
+          "properties": {
+            "name": { "type": "string", "const": "genesis sim run" },
+            "description": { "type": "string", "const": "Runs a Gazebo simulation from a *_gazebo package." },
+            "arguments": {
+              "type": "object",
+              "properties": {
+                "package_name": {
+                  "type": "string",
+                  "pattern": "^[a-z0-9_]+_gazebo$"
+                },
+                "world": {
+                  "type": "string",
+                  "description": "Optional world file name (default: empty.world)."
+                },
+                "headless": {
+                  "type": "boolean",
+                  "description": "Run Gazebo in headless mode."
+                }
+              },
+              "required": ["package_name"]
+            },
+            "behavior": {
+              "type": "object",
+              "properties": {
+                "launch_file": { "type": "string", "const": "launch/<package_name>.launch.py" },
+                "no_temp_files": { "type": "boolean", "const": true },
+                "environment": {
+                  "type": "object",
+                  "properties": {
+                    "GAZEBO_MODEL_PATH": { "type": "string", "const": "sim/<package_name>/models" },
+                    "GAZEBO_WORLD_PATH": { "type": "string", "const": "sim/<package_name>/worlds" }
+                  }
+                }
+              },
+              "required": ["launch_file", "no_temp_files", "environment"]
+            }
+          }
+        }
+      ]
+    },
+    "template_directory": {
+      "type": "string",
+      "const": "templates/gazebo/",
+      "description": "Location of Jinja2 templates for generating files."
+    },
+    "template_files": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "path": { "type": "string" },
+          "content": { "type": "string" }
+        },
+        "required": ["path", "content"]
+      },
+      "enum": [
+        {
+          "path": "templates/gazebo/CMakeLists.txt.j2",
+          "content": "cmake_minimum_required(VERSION 3.8)\nproject({{ package_name }})\n\nfind_package(ament_cmake REQUIRED)\nfind_package(rclcpp REQUIRED)\nfind_package(gazebo_ros REQUIRED)\nfind_package({{ source_robot_package }} REQUIRED)\n\ninstall(DIRECTORY launch config worlds models urdf plugins\n  DESTINATION share/${PROJECT_NAME}/)\n\nament_package()"
+        },
+        {
+          "path": "templates/gazebo/package.xml.j2",
+          "content": "<?xml version=\"1.0\"?>\n<package format=\"3\">\n  <name>{{ package_name }}</name>\n  <version>0.1.0</version>\n  <description>Gazebo simulation for {{ source_robot_package }}</description>\n  <maintainer email=\"dev@yourcompany.com\">Your Team</maintainer>\n  <license>Apache-2.0</license>\n  <depend>rclcpp</depend>\n  <depend>gazebo_ros</depend>\n  <depend>{{ source_robot_package }}</depend>\n  <depend>xacro</depend>\n  <export>\n    <build_type>ament_cmake</build_type>\n  </export>\n</package>"
+        },
+        {
+          "path": "templates/gazebo/launch/main.launch.py.j2",
+          "content": "from launch import LaunchDescription\nfrom launch_ros.actions import Node\nfrom launch.actions import IncludeLaunchDescription\nfrom launch.launch_description_sources import PythonLaunchDescriptionSource\nimport os\n\ndef generate_launch_description():\n    pkg = get_package_share_directory('{{ package_name }}')\n    world = os.getenv('GAZEBO_WORLD', 'empty.world')\n    world_path = os.path.join(pkg, 'worlds', world)\n\n    return LaunchDescription([\n        Node(\n            package='gazebo_ros',\n            executable='gzserver',\n            arguments=[world_path],\n            output='screen'\n        ),\n        Node(\n            package='gazebo_ros',\n            executable='gzclient',\n            output='screen',\n            condition=UnlessCondition(os.getenv('HEADLESS', '0'))\n        ),\n        IncludeLaunchDescription(\n            PythonLaunchDescriptionSource(\n                os.path.join(pkg, 'launch', 'spawn_{{ robot_name }}.launch.py')\n            )\n        )\n    ])"
+        },
+        {
+          "path": "templates/gazebo/launch/spawn.launch.py.j2",
+          "content": "from launch import LaunchDescription\nfrom launch_ros.actions import Node\n\ndef generate_launch_description():\n    return LaunchDescription([\n        Node(\n            package='gazebo_ros',\n            executable='spawn_entity.py',\n            arguments=['-entity', '{{ robot_name }}', '-file', '{{ package_share_directory }}/{{ package_name }}/urdf/{{ robot_name }}.urdf.xacro'],\n            output='screen'\n        )\n    ])"
+        },
+        {
+          "path": "templates/gazebo/config/controllers.yaml.j2",
+          "content": "controller_manager:\n  ros__parameters:\n    update_rate: 100\n    joint_state_controller:\n      type: joint_state_controller/JointStateController\n"
+        },
+        {
+          "path": "templates/gazebo/worlds/empty.world",
+          "content": "<?xml version=\"1.0\" ?>\n<sdf version=\"1.6\">\n  <world name=\"empty\">\n    <include>\n      <uri>model://ground_plane</uri>\n    </include>\n    <include>\n      <uri>model://sun</uri>\n    </include>\n  </world>\n</sdf>"
+        }
+      ]
+    }
+  },
+  "required": ["cli_commands", "template_directory", "template_files"],
+  "additionalProperties": false
+}

@@ -1,0 +1,12 @@
+cmake_minimum_required(VERSION 3.8)
+project({{ package_name }})
+
+find_package(ament_cmake REQUIRED)
+find_package(rclcpp REQUIRED)
+find_package(gazebo_ros REQUIRED)
+find_package({{ source_robot_package }} REQUIRED)
+
+install(DIRECTORY launch config worlds models urdf plugins
+  DESTINATION share/${PROJECT_NAME}/)
+
+ament_package()

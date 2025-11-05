@@ -18,8 +18,7 @@ def new(project_name):
         "src",
         "launch",
         "config",
-        "sim/worlds",
-        "sim/models",
+        "sim",
         "tests",
         "scripts",
         "tools"

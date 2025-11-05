@@ -2,154 +2,161 @@ import os
 import click
 import sys
 import subprocess
-import tempfile
-import xml.etree.ElementTree as ET
+import shutil
+from pathlib import Path
+from ament_index_python.packages import get_package_share_directory, PackageNotFoundError
 from genesys_cli.utils import get_sourcing_command
 
-@click.command()
-@click.argument('world_file')
-def sim(world_file):
-    """Launches a simulation with a specified world file and robot models (supports multiple URDF/SDF, namespaced)."""
+@click.group()
+def sim():
+    """Manages ROS 2 Gazebo simulations in the sim/ workspace."""
+    pass
 
-    # 1. Verify workspace state
-    if not os.path.isdir('install'):
-        click.secho("Error: 'install' directory not found. Have you built the workspace yet?", fg="red")
-        click.secho("Try running 'genesys build' first.", fg="yellow")
+def _render_template(template_content, context):
+    for key, value in context.items():
+        placeholder = f'{{{{ {key} }}}}'
+        template_content = template_content.replace(placeholder, str(value))
+    return template_content
+
+def _get_template_path(template_name):
+    return os.path.join(os.path.dirname(__file__), 'templates', 'gazebo', template_name)
+
+@sim.command()
+@click.argument('package_name', callback=lambda ctx, param, value: value.lower())
+@click.option('--from', 'from_pkg', required=True, help='Source robot description package (e.g., ur_description).')
+def create(package_name, from_pkg):
+    """Creates a new *_gazebo package in sim/ for a robot."""
+    
+    if not package_name.endswith('_gazebo'):
+        click.secho("Error: package_name must end with '_gazebo'.", fg='red')
         sys.exit(1)
 
-    sim_worlds_dir = 'sim/worlds'
-    if not os.path.isdir(sim_worlds_dir):
-        click.secho(f"Error: Simulation worlds directory not found at './{sim_worlds_dir}'", fg="red")
-        click.secho("Ensure your project was created with 'genesys new'.", fg="yellow")
+    sim_dir = 'sim'
+    Path(sim_dir).mkdir(exist_ok=True)
+
+    package_path = Path(sim_dir) / package_name
+    if package_path.exists():
+        click.secho(f"Error: Package '{package_name}' already exists.", fg='red')
         sys.exit(1)
 
-    world_path = os.path.join(sim_worlds_dir, world_file)
-    if not os.path.exists(world_path):
-        click.secho(f"Error: World file not found: {world_path}", fg="red")
-        sys.exit(1)
+    click.echo(f"Creating Gazebo package: {package_path}")
 
-        # 2. Find robot models in sim/models
-    def is_valid_robot_model(path: str) -> bool:
-        """Check if the XML root is <sdf> or <robot> (valid for ROS2 spawn_entity)."""
-        try:
-            tree = ET.parse(path)
-            root = tree.getroot().tag.lower()
-            return root in ("sdf", "robot")
-        except Exception:
-            return False
+    # === 1. Create directories ===
+    dirs = ["launch", "config", "worlds", "models", "urdf", "plugins", "scripts"]
+    for d in dirs:
+        (package_path / d).mkdir(parents=True)
 
-    sim_models_dir = 'sim/models'
-    robot_models = []
-    if os.path.isdir(sim_models_dir):
-        for file in os.listdir(sim_models_dir):
-            if file.endswith(('.urdf', '.xacro', '.sdf')):
-                model_path = os.path.join(sim_models_dir, file)
+    # === 2. Render templates ===
+    robot_name = package_name.replace('_gazebo', '')
+    context = {
+        'package_name': package_name,
+        'source_robot_package': from_pkg,
+        'robot_name': robot_name
+    }
 
-                if is_valid_robot_model(model_path):
-                    robot_models.append(model_path)
-                    click.echo(f"Found robot model: {model_path}")
-                else:
-                    click.secho(
-                        f"⚠️  Skipping {model_path} (not a valid URDF/SDF root element for ROS2)",
-                        fg="yellow"
-                    )
+    templates = {
+        'CMakeLists.txt.j2': 'CMakeLists.txt',
+        'package.xml.j2': 'package.xml',
+        'launch/main.launch.py.j2': f'launch/{package_name}.launch.py',
+        'launch/spawn.launch.py.j2': f'launch/spawn_{robot_name}.launch.py',
+        'config/controllers.yaml.j2': 'config/controllers.yaml',
+        'worlds/empty.world': 'worlds/empty.world'
+    }
 
-    if not robot_models:
-        click.secho("Warning: No valid robot models (.urdf/.xacro/.sdf) found in 'sim/models/'.", fg="yellow")
-        click.secho("Gazebo will be launched without robots.", fg="yellow")
+    for tmpl, output in templates.items():
+        tmpl_path = _get_template_path(tmpl)
+        output_path = package_path / output
+        with open(tmpl_path, 'r') as f:
+            content = f.read()
+        rendered = content if not tmpl.endswith('.j2') else _render_template(content, context)
+        output_path.write_text(rendered)
+        click.echo(f"  Created {output_path}")
 
-    # 3. Generate temporary launch file
-    workspace_root_abs = os.getcwd()
-    world_path_abs = os.path.join(workspace_root_abs, world_path)
-
-    launch_content_parts = [
-        "import os",
-        "from ament_index_python.packages import get_package_share_directory",
-        "from launch import LaunchDescription",
-        "from launch.actions import IncludeLaunchDescription",
-        "from launch.launch_description_sources import PythonLaunchDescriptionSource",
-        "from launch_ros.actions import Node",
-        "",
-        "def generate_launch_description():",
-        "    pkg_gazebo_ros = get_package_share_directory('gazebo_ros')",
-        f"    world_path = '{world_path_abs}'",
-        "    gzserver_cmd = IncludeLaunchDescription(",
-        "        PythonLaunchDescriptionSource(os.path.join(pkg_gazebo_ros, 'launch', 'gzserver.launch.py')),", 
-        "        launch_arguments={'world': world_path, 'verbose': 'true'}.items()",
-        "    )",
-        "    gzclient_cmd = IncludeLaunchDescription(",
-        "        PythonLaunchDescriptionSource(os.path.join(pkg_gazebo_ros, 'launch', 'gzclient.launch.py'))",
-        "    )",
-        "    ld = LaunchDescription([gzserver_cmd, gzclient_cmd])",
-    ]
-
-    for idx, model_path in enumerate(robot_models, start=1):
-        abs_model_path = os.path.join(workspace_root_abs, model_path)
-        ext = os.path.splitext(abs_model_path)[1].lower()
-        base_name = os.path.splitext(os.path.basename(abs_model_path))[0]
-
-        # Namespace for this robot (robot1, robot2, ...)
-        ns = f"robot{idx}"
-        robot_name = f"{base_name}_{ns}"
-
-        if ext in [".urdf", ".xacro"]:
-            launch_content_parts.extend([
-                f"    with open('{abs_model_path}', 'r') as infp:",
-                "        robot_desc = infp.read()",
-                f"    robot_state_publisher_node_{ns} = Node(",
-                "        package='robot_state_publisher',",
-                "        executable='robot_state_publisher',",
-                "        output='screen',",
-                f"        namespace='{ns}',",
-                "        parameters=[{'robot_description': robot_desc, 'use_sim_time': True}]",
-                "    )",
-                f"    spawn_entity_node_{ns} = Node(",
-                "        package='gazebo_ros',",
-                "        executable='spawn_entity.py',",
-                f"        arguments=['-entity', '{robot_name}', '-topic', 'robot_description'],",
-                f"        namespace='{ns}',",
-                "        output='screen'",
-                "    )",
-                f"    ld.add_action(robot_state_publisher_node_{ns})",
-                f"    ld.add_action(spawn_entity_node_{ns})",
-            ])
-
-        elif ext == ".sdf":
-            launch_content_parts.extend([
-                f"    spawn_entity_node_{ns} = Node(",
-                "        package='gazebo_ros',",
-                "        executable='spawn_entity.py',",
-                f"        arguments=['-entity', '{robot_name}', '-file', '{abs_model_path}'],",
-                f"        namespace='{ns}',",
-                "        output='screen'",
-                "    )",
-                f"    ld.add_action(spawn_entity_node_{ns})",
-            ])
-
-    launch_content_parts.append("    return ld")
-    launch_content = "\n".join(launch_content_parts)
-
-    temp_launch_file = None
-    process = None
+    # === 3. Symlink URDF using ament_index ===
     try:
-        with tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='_sim_launch.py') as f:
-            temp_launch_file = f.name
-            f.write(launch_content)
-        source_prefix, shell_exec = get_sourcing_command(clean_env=True)
-        command_to_run = source_prefix + f"ros2 launch {temp_launch_file}"
-        click.echo(f"Executing: ros2 launch {os.path.basename(temp_launch_file)}")
-        process = subprocess.Popen(command_to_run, shell=True, executable=shell_exec)
-        click.secho("\n✓ Simulation is starting...", fg="cyan")
-        if robot_models:
-            click.echo(f"  {len(robot_models)} robot(s) have been spawned with namespaces /robot1, /robot2, ...")
-            click.echo("  Run control/logic nodes in the correct namespace (e.g., `ros2 run pkg node --ros-args -r __ns:=/robot1`).")
+        source_urdf_path = Path(get_package_share_directory(from_pkg)) / 'urdf'
+        if not source_urdf_path.exists():
+            raise PackageNotFoundError(f"URDF not found in {from_pkg}")
+    except PackageNotFoundError:
+        click.secho(f"Error: Package '{from_pkg}' not found or not built.", fg='red')
+        click.secho("Run 'genesys build' and try again.", fg='yellow')
+        sys.exit(1)
+
+    target_urdf = package_path / 'urdf'
+    if target_urdf.exists():
+        if target_urdf.is_symlink():
+            target_urdf.unlink()
+        else:
+            shutil.rmtree(target_urdf)
+    
+    relative_source = os.path.relpath(source_urdf_path, package_path)
+    click.echo(f"Symlinking urdf → {relative_source}")
+    try:
+        os.symlink(relative_source, target_urdf)  # Standard symlink
+    except OSError as e:
+        click.secho(f"Warning: Symlink failed (may need admin): {e}", fg='yellow')
+        click.secho("  Falling back to copy...", fg='yellow')
+        shutil.copytree(source_urdf_path, target_urdf)
+
+    click.secho(f"\nPackage '{package_name}' created successfully!", fg='green')
+    click.echo("Next: Run 'genesys build' then 'genesys sim run {package_name}'")
+
+
+@sim.command(name='run')
+@click.argument('package_name')
+@click.option('--world', default='empty.world', help="World file (in package's worlds/).")
+@click.option('--headless', is_flag=True, help='Run without GUI.')
+def run_sim(package_name, world, headless):
+    """Runs a Gazebo simulation from a *_gazebo package."""
+
+    if not Path('install').exists():
+        click.secho("Error: Workspace not built.", fg='red')
+        click.secho("Run: genesys build", fg='yellow')
+        sys.exit(1)
+
+    package_path = Path('sim') / package_name
+    if not package_path.exists():
+        click.secho(f"Error: Package '{package_name}' not found in sim/.", fg='red')
+        sys.exit(1)
+
+    launch_file = package_path / 'launch' / f'{package_name}.launch.py'
+    if not launch_file.exists():
+        click.secho(f"Error: Launch file not found: {launch_file}", fg='red')
+        sys.exit(1)
+
+    # === Environment ===
+    env = os.environ.copy()
+    models_path = str(package_path / 'models')
+    worlds_path = str(package_path / 'worlds')
+
+    # Gazebo Classic → GAZEBO_MODEL_PATH
+    # Gazebo Sim (Ignition) → GZ_SIM_RESOURCE_PATH
+    env['GAZEBO_MODEL_PATH'] = models_path
+    env['GZ_SIM_RESOURCE_PATH'] = f"{worlds_path}{os.pathsep}{models_path}"
+
+    if world != 'empty.world':
+        env['GAZEBO_WORLD'] = world
+    if headless:
+        env['HEADLESS'] = '1'
+
+    # === Launch ===
+    source_cmd, shell = get_sourcing_command(clean_env=False)
+    cmd = f"{source_cmd} ros2 launch {package_name} {launch_file.name}"
+
+    click.echo(f"Launching: {package_name} with world='{world}'")
+    if headless:
+        click.echo("  (headless mode)")
+
+    try:
+        process = subprocess.Popen(
+            cmd, shell=True, executable=shell, env=env,
+            cwd=os.getcwd()
+        )
+        click.secho("\nSimulation running... (Ctrl+C to stop)", fg='cyan')
         process.wait()
     except KeyboardInterrupt:
-        click.echo("\nSimulation interrupted by user.")
-        if process and process.poll() is None:
-            process.terminate()
+        click.echo("\nShutting down...")
+        process.terminate()
+        process.wait()
     except Exception as e:
-        click.secho(f"An error occurred during simulation launch: {e}", fg="red")
-    finally:
-        if temp_launch_file and os.path.exists(temp_launch_file):
-            os.remove(temp_launch_file)
+        click.secho(f"Launch failed: {e}", fg='red')
