@@ -1,0 +1,41 @@
+#include "genesys/macros.hpp"
+#include "std_msgs/msg/string.hpp"
+#include <string>
+
+// Use GEN_NODE to define the class.
+GEN_NODE({{ class_name }}, "{{ node_name }}")
+{
+    // GEN_PARAM(member_variable, "ros_parameter_name", default_value);
+    // This creates a member variable `my_message` and a ROS parameter `my_message`
+    // with a default value. The member variable is automatically updated when
+    // the ROS parameter is changed.
+    GEN_PARAM(my_message, "my_message", std::string("Hello from parameter node!"));
+
+    // We'll use a timer to periodically print the value of the parameter.
+    GEN_TIMER(on_timer, 2000);
+};
+
+// Timer callback implementation.
+void {{ class_name }}::on_timer()
+{
+    // Access the parameter value via the member variable.
+    RCLCPP_INFO(this->get_logger(), "Current message: '%s'", my_message.c_str());
+}
+
+// This helper macro implements the parameter setter method.
+// It must be defined after the class.
+GEN_SET_MEMBER_IMPL({{ class_name }})
+{
+    // For each GEN_PARAM, add a GEN_PARAM_CASE here.
+    // The second argument is the C++ type of the parameter.
+    GEN_PARAM_CASE(my_message, std::string)
+}
+GEN_SET_MEMBER_END
+
+int main(int argc, char * argv[])
+{
+    rclcpp::init(argc, argv);
+    rclcpp::spin(std::make_shared<{{ class_name }}>());
+    rclcpp::shutdown();
+    return 0;
+}

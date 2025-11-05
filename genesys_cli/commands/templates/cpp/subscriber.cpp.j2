@@ -1,0 +1,33 @@
+#include "genesys/macros.hpp"
+#include "std_msgs/msg/string.hpp"
+
+// Use GEN_NODE to define the class.
+GEN_NODE({{ class_name }}, "{{ node_name }}")
+{
+    // GEN_SUB(topic_name, message_type, qos_profile);
+    // This macro declares a callback method `void topic_name(std::shared_ptr<const msg_type> msg)`
+    // which you must implement.
+    GEN_SUB(chatter, std_msgs::msg::String, rclcpp::QoS(10));
+};
+
+// Implementation for the 'chatter' subscriber callback.
+void {{ class_name }}::chatter(std::shared_ptr<const std_msgs::msg::String> msg)
+{
+    RCLCPP_INFO(this->get_logger(), "I heard: '%s'", msg->data.c_str());
+}
+
+// This helper macro implements the parameter setter method.
+// It is required even if there are no parameters.
+GEN_SET_MEMBER_IMPL({{ class_name }})
+{
+    // No parameters in this example.
+}
+GEN_SET_MEMBER_END
+
+int main(int argc, char * argv[])
+{
+    rclcpp::init(argc, argv);
+    rclcpp::spin(std::make_shared<{{ class_name }}>());
+    rclcpp::shutdown();
+    return 0;
+}
