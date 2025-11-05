@@ -7,6 +7,7 @@ setup(
     packages=find_packages(),
     install_requires=[
         'click',
+        'Jinja2',
         # rclpy and other ROS packages are expected to be in the sourced environment
     ],
     entry_points={

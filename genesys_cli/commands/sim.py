@@ -3,6 +3,8 @@ import click
 import sys
 import subprocess
 import shutil
+from pathlib import Path
+from ament_index_python.packages import get_package_share_directory, PackageNotFoundError
 from genesys_cli.utils import get_sourcing_command
 
 @click.group()
@@ -11,13 +13,12 @@ def sim():
     pass
 
 def _render_template(template_content, context):
-    """A simple Jinja2-like renderer."""
     for key, value in context.items():
-        template_content = template_content.replace(f'{{{{ {key} }}}}', str(value))
+        placeholder = f'{{{{ {key} }}}}'
+        template_content = template_content.replace(placeholder, str(value))
     return template_content
 
 def _get_template_path(template_name):
-    """Gets the full path to a template file."""
     return os.path.join(os.path.dirname(__file__), 'templates', 'gazebo', template_name)
 
 @sim.command()
@@ -31,30 +32,29 @@ def create(package_name, from_pkg):
         sys.exit(1)
 
     sim_dir = 'sim'
-    if not os.path.isdir(sim_dir):
-        os.makedirs(sim_dir)
+    Path(sim_dir).mkdir(exist_ok=True)
 
-    package_path = os.path.join(sim_dir, package_name)
-    if os.path.exists(package_path):
-        click.secho(f"Error: Package '{package_name}' already exists at '{package_path}'.", fg='red')
+    package_path = Path(sim_dir) / package_name
+    if package_path.exists():
+        click.secho(f"Error: Package '{package_name}' already exists.", fg='red')
         sys.exit(1)
 
-    click.echo(f"Creating Gazebo package at '{package_path}' from '{from_pkg}'...")
+    click.echo(f"Creating Gazebo package: {package_path}")
 
-    # 1. Create directories
-    dirs_to_create = ["launch", "config", "worlds", "models", "urdf", "plugins", "scripts"]
-    for d in dirs_to_create:
-        os.makedirs(os.path.join(package_path, d))
-    
-    # 2. Create files from templates
+    # === 1. Create directories ===
+    dirs = ["launch", "config", "worlds", "models", "urdf", "plugins", "scripts"]
+    for d in dirs:
+        (package_path / d).mkdir(parents=True)
+
+    # === 2. Render templates ===
     robot_name = package_name.replace('_gazebo', '')
-    template_context = {
+    context = {
         'package_name': package_name,
         'source_robot_package': from_pkg,
         'robot_name': robot_name
     }
 
-    files_to_create = {
+    templates = {
         'CMakeLists.txt.j2': 'CMakeLists.txt',
         'package.xml.j2': 'package.xml',
         'launch/main.launch.py.j2': f'launch/{package_name}.launch.py',
@@ -63,101 +63,100 @@ def create(package_name, from_pkg):
         'worlds/empty.world': 'worlds/empty.world'
     }
 
-    for template, output_file in files_to_create.items():
-        template_path = _get_template_path(template)
-        output_path = os.path.join(package_path, output_file)
-        
-        with open(template_path, 'r') as f:
-            template_content = f.read()
-        
-        if not template.endswith('.j2'):
-            rendered_content = template_content
-        else:
-            rendered_content = _render_template(template_content, template_context)
-
-        with open(output_path, 'w') as f:
-            f.write(rendered_content)
+    for tmpl, output in templates.items():
+        tmpl_path = _get_template_path(tmpl)
+        output_path = package_path / output
+        with open(tmpl_path, 'r') as f:
+            content = f.read()
+        rendered = content if not tmpl.endswith('.j2') else _render_template(content, context)
+        output_path.write_text(rendered)
         click.echo(f"  Created {output_path}")
 
-    # 3. Symlink URDF
-    source_urdf_rel = os.path.join('..', '..', 'src', from_pkg, 'urdf')
-    target_urdf = os.path.join(package_path, 'urdf')
-    
-    os.rmdir(target_urdf)
-
-    click.echo(f"Symlinking URDF from '{source_urdf_rel}' to '{target_urdf}'")
+    # === 3. Symlink URDF using ament_index ===
     try:
-        os.symlink(source_urdf_rel, target_urdf, target_is_directory=True)
-    except OSError as e:
-        click.secho(f"Warning: Failed to create symlink. You may need to run as administrator on Windows.", fg='yellow')
-        click.secho(f"  Error: {e}", fg='yellow')
-        click.secho(f"  Please manually link '{os.path.abspath(source_urdf_rel)}' to '{os.path.abspath(target_urdf)}'.", fg='yellow')
-        os.makedirs(target_urdf)
-    except Exception as e:
-        click.secho(f"An unexpected error occurred during symlinking: {e}", fg='red')
-        os.makedirs(target_urdf)
+        source_urdf_path = Path(get_package_share_directory(from_pkg)) / 'urdf'
+        if not source_urdf_path.exists():
+            raise PackageNotFoundError(f"URDF not found in {from_pkg}")
+    except PackageNotFoundError:
+        click.secho(f"Error: Package '{from_pkg}' not found or not built.", fg='red')
+        click.secho("Run 'genesys build' and try again.", fg='yellow')
+        sys.exit(1)
 
-    click.secho(f"\n✓ Package '{package_name}' created successfully.", fg='green')
-    click.echo("Next steps: Run 'genesys build' to build the new package.")
+    target_urdf = package_path / 'urdf'
+    if target_urdf.exists():
+        if target_urdf.is_symlink():
+            target_urdf.unlink()
+        else:
+            shutil.rmtree(target_urdf)
+    
+    relative_source = os.path.relpath(source_urdf_path, package_path)
+    click.echo(f"Symlinking urdf → {relative_source}")
+    try:
+        os.symlink(relative_source, target_urdf)  # Standard symlink
+    except OSError as e:
+        click.secho(f"Warning: Symlink failed (may need admin): {e}", fg='yellow')
+        click.secho("  Falling back to copy...", fg='yellow')
+        shutil.copytree(source_urdf_path, target_urdf)
+
+    click.secho(f"\nPackage '{package_name}' created successfully!", fg='green')
+    click.echo("Next: Run 'genesys build' then 'genesys sim run {package_name}'")
 
 
 @sim.command(name='run')
 @click.argument('package_name')
-@click.option('--world', default=None, help="Optional world file name (default: empty.world).")
-@click.option('--headless', is_flag=True, help='Run Gazebo in headless mode.')
+@click.option('--world', default='empty.world', help="World file (in package's worlds/).")
+@click.option('--headless', is_flag=True, help='Run without GUI.')
 def run_sim(package_name, world, headless):
     """Runs a Gazebo simulation from a *_gazebo package."""
 
-    if not os.path.isdir('install'):
-        click.secho("Error: 'install' directory not found. Have you built the workspace yet?", fg="red")
-        click.secho("Try running 'genesys build' first.", fg="yellow")
+    if not Path('install').exists():
+        click.secho("Error: Workspace not built.", fg='red')
+        click.secho("Run: genesys build", fg='yellow')
         sys.exit(1)
 
-    package_path = os.path.join('sim', package_name)
-    if not os.path.isdir(package_path):
-        click.secho(f"Error: Simulation package '{package_name}' not found at '{package_path}'.", fg="red")
-        click.secho("Try running 'genesys sim create ...' first.", fg='yellow')
+    package_path = Path('sim') / package_name
+    if not package_path.exists():
+        click.secho(f"Error: Package '{package_name}' not found in sim/.", fg='red')
         sys.exit(1)
 
-    launch_file_name = f'{package_name}.launch.py'
-    
+    launch_file = package_path / 'launch' / f'{package_name}.launch.py'
+    if not launch_file.exists():
+        click.secho(f"Error: Launch file not found: {launch_file}", fg='red')
+        sys.exit(1)
+
+    # === Environment ===
     env = os.environ.copy()
-    
-    gazebo_model_path = os.path.abspath(os.path.join(package_path, 'models'))
-    if 'GAZEBO_MODEL_PATH' in env:
-        env['GAZEBO_MODEL_PATH'] = f"{env['GAZEBO_MODEL_PATH']}{os.pathsep}{gazebo_model_path}"
-    else:
-        env['GAZEBO_MODEL_PATH'] = gazebo_model_path
-        
-    gazebo_world_path = os.path.abspath(os.path.join(package_path, 'worlds'))
-    if 'GAZEBO_RESOURCE_PATH' in env:
-        env['GAZEBO_RESOURCE_PATH'] = f"{env['GAZEBO_RESOURCE_PATH']}{os.pathsep}{gazebo_world_path}"
-    else:
-        env['GAZEBO_RESOURCE_PATH'] = gazebo_world_path
+    models_path = str(package_path / 'models')
+    worlds_path = str(package_path / 'worlds')
 
-    if world:
+    # Gazebo Classic → GAZEBO_MODEL_PATH
+    # Gazebo Sim (Ignition) → GZ_SIM_RESOURCE_PATH
+    env['GAZEBO_MODEL_PATH'] = models_path
+    env['GZ_SIM_RESOURCE_PATH'] = f"{worlds_path}{os.pathsep}{models_path}"
+
+    if world != 'empty.world':
         env['GAZEBO_WORLD'] = world
-    
     if headless:
         env['HEADLESS'] = '1'
 
-    source_prefix, shell_exec = get_sourcing_command(clean_env=False)
-    command_to_run = source_prefix + f"ros2 launch {package_name} {launch_file_name}"
+    # === Launch ===
+    source_cmd, shell = get_sourcing_command(clean_env=False)
+    cmd = f"{source_cmd} ros2 launch {package_name} {launch_file.name}"
 
-    click.echo(f"Executing: {command_to_run}")
-    if world:
-        click.echo(f"  with world: {world}")
+    click.echo(f"Launching: {package_name} with world='{world}'")
     if headless:
-        click.echo("  in headless mode.")
-        
-    process = None
+        click.echo("  (headless mode)")
+
     try:
-        process = subprocess.Popen(command_to_run, shell=True, executable=shell_exec, env=env)
-        click.secho("\n✓ Simulation is starting...", fg="cyan")
+        process = subprocess.Popen(
+            cmd, shell=True, executable=shell, env=env,
+            cwd=os.getcwd()
+        )
+        click.secho("\nSimulation running... (Ctrl+C to stop)", fg='cyan')
         process.wait()
     except KeyboardInterrupt:
-        click.echo("\nSimulation interrupted by user.")
-        if process and process.poll() is None:
-            process.terminate()
+        click.echo("\nShutting down...")
+        process.terminate()
+        process.wait()
     except Exception as e:
-        click.secho(f"An error occurred during simulation launch: {e}", fg="red")
+        click.secho(f"Launch failed: {e}", fg='red')
