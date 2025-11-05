@@ -1,0 +1,41 @@
+from launch import LaunchDescription
+from launch.actions import IncludeLaunchDescription
+from launch.launch_description_sources import PythonLaunchDescriptionSource
+from launch_ros.actions import Node
+from ament_index_python.packages import get_package_share_directory
+from launch.conditions import UnlessCondition
+import os
+
+def generate_launch_description():
+    pkg_share = get_package_share_directory('{{ package_name }}')
+    
+    world_file = os.getenv('GAZEBO_WORLD', 'empty.world')
+    world_path = os.path.join(pkg_share, 'worlds', world_file)
+    
+    robot_name = '{{ robot_name }}'
+
+    gzserver = Node(
+        package='gazebo_ros',
+        executable='gzserver',
+        arguments=[world_path],
+        output='screen'
+    )
+
+    gzclient = Node(
+        package='gazebo_ros',
+        executable='gzclient',
+        output='screen',
+        condition=UnlessCondition(os.getenv('HEADLESS', '0'))
+    )
+
+    spawner = IncludeLaunchDescription(
+        PythonLaunchDescriptionSource(
+            os.path.join(pkg_share, 'launch', f'spawn_{robot_name}.launch.py')
+        )
+    )
+
+    return LaunchDescription([
+        gzserver,
+        gzclient,
+        spawner
+    ])
