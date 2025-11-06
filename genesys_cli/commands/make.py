@@ -51,7 +51,6 @@ def make_node(ctx, node_name, pkg_name):
             f.write(py_boilerplate)
         click.secho(f"✓ Created Python node file: {node_file}", fg="green")
         add_python_entry_point(pkg_name, node_name)
-        add_install_rule_for_launch_dir(pkg_name)
     elif os.path.exists(os.path.join(pkg_path, 'CMakeLists.txt')):
         # C++ package
         node_dir = os.path.join(pkg_path, 'src')
@@ -69,7 +68,6 @@ def make_node(ctx, node_name, pkg_name):
             f.write(cpp_boilerplate)
         click.secho(f"✓ Created C++ node file: {node_file}", fg="green")
         add_cpp_executable(pkg_name, node_name)
-        add_install_rule_for_launch_dir_cpp(pkg_name)
     else:
         click.secho(f"Error: Could not determine package type for '{pkg_name}'. No setup.py or CMakeLists.txt found.", fg="red")
         sys.exit(1)
@@ -77,6 +75,10 @@ def make_node(ctx, node_name, pkg_name):
     add_launch_file_boilerplate(pkg_name, node_name)
     add_node_to_launch(pkg_name, node_name)
     add_default_launch_file(pkg_name)
+    
+    # Add install rules *after* launch files are created.
+    add_install_rule_for_launch_dir(pkg_name)
+    add_install_rule_for_launch_dir_cpp(pkg_name)
 
     click.echo("\nRun 'genesys build' to make the new node available.")
 
