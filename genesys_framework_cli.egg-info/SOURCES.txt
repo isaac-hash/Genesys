@@ -9,7 +9,9 @@ genesys/__init__.py
 genesys/decorators.py
 genesys/genesys.cmake
 genesys/helpers.py
+genesys/cmake/genesysConfig.cmake
 genesys/include/genesys/macros.hpp
+genesys/resource/genesys
 genesys_cli/__init__.py
 genesys_cli/main.py
 genesys_cli/scaffolding.py
