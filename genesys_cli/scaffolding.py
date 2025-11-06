@@ -161,9 +161,26 @@ def add_cpp_executable(pkg_name, node_name):
         click.secho(f"Error: Could not find ament_package() call in {cmake_file}.", fg="red")
         return
 
+    # --- Add find_package calls for common C++ dependencies ---
+    find_package_section = ""
+    if "find_package(rclcpp REQUIRED)" not in content:
+        find_package_section += "\nfind_package(rclcpp REQUIRED)"
+    if "find_package(std_msgs REQUIRED)" not in content:
+        find_package_section += "\nfind_package(std_msgs REQUIRED)"
+
+    if find_package_section:
+        # Insert after find_package(ament_cmake REQUIRED)
+        ament_cmake_find = re.search(r"find_package\(ament_cmake REQUIRED\)", content)
+        if ament_cmake_find:
+            insert_pos = ament_cmake_find.end()
+            content = content[:insert_pos] + find_package_section + content[insert_pos:]
+
     insert_pos = ament_package_call.start()
     new_cmake_commands = f"""add_executable({node_name} {node_src_file})
-ament_target_dependencies({node_name} rclcpp)
+ament_target_dependencies({node_name}
+  rclcpp
+  std_msgs
+)
 
 install(TARGETS
   {node_name}
