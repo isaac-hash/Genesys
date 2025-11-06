@@ -184,7 +184,7 @@ ament_target_dependencies({node_name}
 
 install(TARGETS
   {node_name}
-  DESTINATION lib/${{PROJECT_NAME}})
+  DESTINATION lib/${{PROJECT_NAME}}/)
 
 """
     updated_content = content[:insert_pos] + new_cmake_commands + content[insert_pos:]
