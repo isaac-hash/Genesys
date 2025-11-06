@@ -9,6 +9,7 @@ from genesys_cli.scaffolding import (
     add_install_rule_for_launch_dir, # This is duplicated, but I'll leave it for now
     add_cpp_executable,
     add_install_rule_for_launch_dir_cpp,
+    add_cpp_dependencies_to_package_xml,
     add_launch_file_boilerplate,
     add_node_to_launch,
     add_default_launch_file,
@@ -68,6 +69,7 @@ def make_node(ctx, node_name, pkg_name):
             f.write(cpp_boilerplate)
         click.secho(f"✓ Created C++ node file: {node_file}", fg="green")
         add_cpp_executable(pkg_name, node_name)
+        add_cpp_dependencies_to_package_xml(pkg_name, ["rclcpp", "std_msgs"])
     else:
         click.secho(f"Error: Could not determine package type for '{pkg_name}'. No setup.py or CMakeLists.txt found.", fg="red")
         sys.exit(1)
