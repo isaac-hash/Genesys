@@ -1,5 +1,5 @@
-Metadata-Version: 2.4
-Name: genesys_framework_cli
+Metadata-Version: 2.1
+Name: genesys-framework-cli
 Version: 0.1.5
 Summary: A developer-friendly, opinionated framework for ROS 2.
 Home-page: UNKNOWN

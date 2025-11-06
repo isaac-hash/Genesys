@@ -156,7 +156,7 @@ def add_cpp_executable(pkg_name, node_name):
         return
 
     # Find the ament_package() call to insert before it
-    ament_package_call = re.search(r"ament_package\(\"", content)
+    ament_package_call = re.search(r"ament_package\((.*?)\)", content, re.DOTALL)
     if not ament_package_call:
         click.secho(f"Error: Could not find ament_package() call in {cmake_file}.", fg="red")
         return
@@ -191,7 +191,7 @@ def add_install_rule_for_launch_dir_cpp(pkg_name):
         return
 
     # Find the ament_package() call to insert before it
-    ament_package_call = re.search(r"ament_package\(\"", content)
+    ament_package_call = re.search(r"ament_package\((.*?)\)", content, re.DOTALL)
     if not ament_package_call:
         click.secho(f"Warning: Could not find ament_package() call in {cmake_file}. Cannot add launch install rule.", fg="yellow")
         return
