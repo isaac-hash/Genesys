@@ -322,3 +322,32 @@ def generate_launch_description():
     with open(default_launch_file, 'w') as f:
         f.write(boilerplate)
     click.secho(f"✓ Auto-generated default launch file: {default_launch_file}", fg="green")
+
+def add_cpp_dependencies_to_package_xml(pkg_name, dependencies):
+    """Adds <depend> tags to a package.xml file for C++ packages."""
+    package_xml_file = os.path.join('src', pkg_name, 'package.xml')
+    if not os.path.exists(package_xml_file):
+        click.secho(f"Warning: {package_xml_file} not found. Cannot add dependencies.", fg="yellow")
+        return
+
+    with open(package_xml_file, 'r') as f:
+        content = f.read()
+
+    # Find the buildtool_depend to insert after
+    buildtool_depend_match = re.search(r'(<buildtool_depend>ament_cmake</buildtool_depend>)', content)
+    if not buildtool_depend_match:
+        click.secho(f"Warning: Could not find <buildtool_depend> in {package_xml_file}. Cannot add dependencies.", fg="yellow")
+        return
+
+    insertion_point = buildtool_depend_match.end()
+    
+    deps_to_add_str = ""
+    for dep in dependencies:
+        if f"<depend>{dep}</depend>" not in content:
+            deps_to_add_str += f"\n  <depend>{dep}</depend>"
+
+    if deps_to_add_str:
+        updated_content = content[:insertion_point] + deps_to_add_str + content[insertion_point:]
+        with open(package_xml_file, 'w') as f:
+            f.write(updated_content)
+        click.secho(f"✓ Added dependencies to {package_xml_file}", fg="green")
