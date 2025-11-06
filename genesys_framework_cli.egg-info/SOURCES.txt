@@ -1,11 +1,15 @@
 LICENSE.txt
+MANIFEST.in
 NOTICE.txt
 README.md
+org.txt
 pyproject.toml
 setup.py
 genesys/__init__.py
 genesys/decorators.py
+genesys/genesys.cmake
 genesys/helpers.py
+genesys/include/genesys/macros.hpp
 genesys_cli/__init__.py
 genesys_cli/main.py
 genesys_cli/scaffolding.py

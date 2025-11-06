@@ -165,7 +165,7 @@ def add_cpp_executable(pkg_name, node_name):
     # --- Find ament_package() line index safely ---
     ament_line_idx = None
     for i, line in enumerate(lines):
-        if line.strip().startswith("ament_package()") or re.match(r"ament_package\(\s*\)", line.strip()):
+        if re.search(r"^\s*ament_package\s*\(\s*\)", line):
             ament_line_idx = i
             break
 
@@ -192,7 +192,7 @@ def add_cpp_executable(pkg_name, node_name):
             lines.insert(insert_after_idx + 1, "".join(new_find_packages))
 
     # --- Build the new executable block ---
-    new_block = f"""
+    new_block = f'''
 add_executable({node_name} {node_src_file})
 ament_target_dependencies({node_name}
   rclcpp
@@ -203,7 +203,7 @@ ament_target_dependencies({node_name}
 install(TARGETS
   {node_name}
   DESTINATION lib/${{PROJECT_NAME}})
-"""
+'''
 
     # --- Insert just before ament_package() ---
     lines.insert(ament_line_idx, new_block)
@@ -213,35 +213,41 @@ install(TARGETS
         f.write(''.join(lines))
 
     click.secho(f"Registered '{node_name}' in {cmake_file}", fg="green")
+
 def add_install_rule_for_launch_dir_cpp(pkg_name):
     """Adds the install rule for the launch directory to CMakeLists.txt."""
     cmake_file = os.path.join('src', pkg_name, 'CMakeLists.txt')
     if not os.path.exists(cmake_file):
-        return # Not a C++ package
+        return  # Not a C++ package
 
     with open(cmake_file, 'r') as f:
-        content = f.read()
+        lines = f.readlines()
 
     # Check if the rule already exists
-    if 'install(DIRECTORY launch' in content:
+    if any('install(DIRECTORY launch' in line for line in lines):
         return
 
     # Find the ament_package() call to insert before it
-    ament_package_call = re.search(r"ament_package\((.*?)\)", content, re.DOTALL)
-    if not ament_package_call:
+    ament_line_idx = None
+    for i, line in enumerate(lines):
+        if re.search(r"^\s*ament_package\s*\(\s*\)", line):
+            ament_line_idx = i
+            break
+
+    if ament_line_idx is None:
         click.secho(f"Warning: Could not find ament_package() call in {cmake_file}. Cannot add launch install rule.", fg="yellow")
         return
 
-    insert_pos = ament_package_call.start()
-    new_cmake_commands = f"""install(
+    new_cmake_commands = f'''install(
   DIRECTORY launch
   DESTINATION share/${{PROJECT_NAME}})
 
-"""
-    updated_content = content[:insert_pos] + new_cmake_commands + content[insert_pos:]
+'''
+    # insert before ament_package()
+    lines.insert(ament_line_idx, new_cmake_commands)
 
     with open(cmake_file, 'w') as f:
-        f.write(updated_content)
+        f.write("".join(lines))
     
     click.secho(f"✓ Added launch directory install rule to {cmake_file}", fg="green")
 
@@ -253,7 +259,7 @@ def add_launch_file_boilerplate(pkg_name, node_name):
     
     # Only create a launch file if it doesn't already exist to avoid overwriting a custom one
     if not os.path.exists(launch_file):
-        boilerplate = f"""from launch import LaunchDescription
+        boilerplate = f'''from launch import LaunchDescription
 from launch_ros.actions import Node
 
 def generate_launch_description():
@@ -266,7 +272,7 @@ def generate_launch_description():
             emulate_tty=True
         ),
     ])
-"""
+'''
         with open(launch_file, 'w') as f:
             f.write(boilerplate)
         click.secho(f"✓ Auto-generated launch file: {launch_file}", fg="green")
@@ -281,13 +287,13 @@ def add_node_to_launch(pkg_name, node_name):
         content = f.read()
 
     # Build the new Node block (with a trailing comma, as per the original design)
-    new_node_block = f"""Node(
+    new_node_block = f'''Node(
             package='{pkg_name}',
             executable='{node_name}',
             name='{node_name}',
             output='screen',
             emulate_tty=True
-        ),"""
+        ),'''
 
     if f"executable='{node_name}'" in content:
         click.secho(f"Launch file already contains '{node_name}'.", fg="yellow")
@@ -316,18 +322,18 @@ def add_default_launch_file(pkg_name):
     if os.path.exists(default_launch_file):
         return
 
-    boilerplate = f"""import os
+    boilerplate = f'''import os
 from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
 from launch.actions import IncludeLaunchDescription
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 
 def generate_launch_description():
-    ""
+    """
     This is the default launch file for the '{pkg_name}' package.
     It is launched when running 'framework launch --all'.
     By default, it includes the package-specific launch file.
-    ""
+    """
     pkg_specific_launch_file_path = os.path.join(
         get_package_share_directory('{pkg_name}'),
         'launch',
@@ -337,7 +343,7 @@ def generate_launch_description():
     return LaunchDescription([
         IncludeLaunchDescription(PythonLaunchDescriptionSource(pkg_specific_launch_file_path))
     ])
-"""
+'''
     with open(default_launch_file, 'w') as f:
         f.write(boilerplate)
     click.secho(f"✓ Auto-generated default launch file: {default_launch_file}", fg="green")
