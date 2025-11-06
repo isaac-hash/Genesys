@@ -52,7 +52,7 @@ def make_node(ctx, node_name, pkg_name):
             f.write(py_boilerplate)
         click.secho(f"✓ Created Python node file: {node_file}", fg="green")
         add_python_entry_point(pkg_name, node_name)
-    elif os.path.exists(os.path.join(pkg_path, 'CMakeLists.txt')):
+    elif os.path.exists(os.path.join(pkg_path, 'CMakeLists.txt')): # C++ package
         # C++ package
         node_dir = os.path.join(pkg_path, 'src')
         os.makedirs(node_dir, exist_ok=True)
