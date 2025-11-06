@@ -197,6 +197,7 @@ add_executable({node_name} {node_src_file})
 ament_target_dependencies({node_name}
   rclcpp
   std_msgs
+  genesys
 )
 
 install(TARGETS
