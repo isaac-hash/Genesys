@@ -144,6 +144,19 @@ def make_pkg(ctx, package_name, with_node, dependencies):
             executable=shell_exec
         )
         click.secho(f"✓ Package '{package_name}' created successfully in 'src/'.", fg="green")
+
+        if lang_choice.lower() == 'c++':
+            cmake_path = os.path.join('src', package_name, 'CMakeLists.txt')
+            with open(cmake_path, 'r') as f:
+                content = f.read()
+
+            # Add find_package(genesys REQUIRED)
+            content = content.replace('find_package(ament_cmake REQUIRED)',
+                                      'find_package(ament_cmake REQUIRED)\nfind_package(genesys REQUIRED)')
+
+            with open(cmake_path, 'w') as f:
+                f.write(content)
+
     except subprocess.CalledProcessError as e:
         click.secho(f"Error creating package '{package_name}':", fg="red")
         click.echo(e.stderr or e.stdout)

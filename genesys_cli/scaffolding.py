@@ -144,56 +144,75 @@ def add_install_rule_for_launch_dir(pkg_name):
     click.secho(f"✓ Added launch directory install rule to {setup_file}", fg="green")
 
 def add_cpp_executable(pkg_name, node_name):
-    """Adds a new executable and install rule to a package's CMakeLists.txt."""
+    """Adds a new executable and install rule to a package's CMakeLists.txt safely."""
     cmake_file = os.path.join('src', pkg_name, 'CMakeLists.txt')
     node_src_file = f"src/{node_name}.cpp"
 
+    if not os.path.exists(cmake_file):
+        click.secho(f"Error: {cmake_file} not found.", fg="red")
+        return
+
     with open(cmake_file, 'r') as f:
-        content = f.read()
+        lines = f.readlines()
 
-    if f'add_executable({node_name}' in content:
-        click.secho(f"Node '{node_name}' already appears to be registered in {cmake_file}.", fg="yellow")
+    content = ''.join(lines)
+
+    # --- Early duplicate check ---
+    if any(f"add_executable({node_name}" in line for line in lines):
+        click.secho(f"Node '{node_name}' already registered in {cmake_file}.", fg="yellow")
         return
 
-    # Find the ament_package() call to insert before it
-    ament_package_call = re.search(r"ament_package\((.*?)\)", content, re.DOTALL)
-    if not ament_package_call:
-        click.secho(f"Error: Could not find ament_package() call in {cmake_file}.", fg="red")
+    # --- Find ament_package() line index safely ---
+    ament_line_idx = None
+    for i, line in enumerate(lines):
+        if line.strip().startswith("ament_package()") or re.match(r"ament_package\(\s*\)", line.strip()):
+            ament_line_idx = i
+            break
+
+    if ament_line_idx is None:
+        click.secho(f"Error: Could not find 'ament_package()' in {cmake_file}.", fg="red")
         return
 
-    # --- Add find_package calls for common C++ dependencies ---
-    find_package_section = ""
-    if "find_package(rclcpp REQUIRED)" not in content:
-        find_package_section += "\nfind_package(rclcpp REQUIRED)"
-    if "find_package(std_msgs REQUIRED)" not in content:
-        find_package_section += "\nfind_package(std_msgs REQUIRED)"
+    # --- Add missing find_package() calls after ament_cmake ---
+    new_find_packages = []
+    if not any("find_package(rclcpp REQUIRED)" in line for line in lines):
+        new_find_packages.append("find_package(rclcpp REQUIRED)\n")
+    if not any("find_package(std_msgs REQUIRED)" in line for line in lines):
+        new_find_packages.append("find_package(std_msgs REQUIRED)\n")
 
-    if find_package_section:
-        # Insert after find_package(ament_cmake REQUIRED)
-        ament_cmake_find = re.search(r"find_package\(ament_cmake REQUIRED\)", content)
-        if ament_cmake_find:
-            insert_pos = ament_cmake_find.end()
-            content = content[:insert_pos] + find_package_section + content[insert_pos:]
+    if new_find_packages:
+        # Find where to insert: after find_package(ament_cmake REQUIRED)
+        insert_after_idx = None
+        for i, line in enumerate(lines):
+            if "find_package(ament_cmake REQUIRED)" in line:
+                insert_after_idx = i
+                break
 
-    insert_pos = ament_package_call.start()
-    new_cmake_commands = f"""add_executable({node_name} {node_src_file})
+        if insert_after_idx is not None:
+            lines.insert(insert_after_idx + 1, "".join(new_find_packages))
+
+    # --- Build the new executable block ---
+    new_block = f"""
+add_executable({node_name} {node_src_file})
 ament_target_dependencies({node_name}
   rclcpp
   std_msgs
+  genesys
 )
 
 install(TARGETS
   {node_name}
-  DESTINATION lib/${{PROJECT_NAME}}/)
-
+  DESTINATION lib/${{PROJECT_NAME}})
 """
-    updated_content = content[:insert_pos] + new_cmake_commands + content[insert_pos:]
 
+    # --- Insert just before ament_package() ---
+    lines.insert(ament_line_idx, new_block)
+
+    # --- Write back safely ---
     with open(cmake_file, 'w') as f:
-        f.write(updated_content)
-    
-    click.secho(f"✓ Registered '{node_name}' in {cmake_file}", fg="green")
+        f.write(''.join(lines))
 
+    click.secho(f"Registered '{node_name}' in {cmake_file}", fg="green")
 def add_install_rule_for_launch_dir_cpp(pkg_name):
     """Adds the install rule for the launch directory to CMakeLists.txt."""
     cmake_file = os.path.join('src', pkg_name, 'CMakeLists.txt')
