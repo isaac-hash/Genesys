@@ -22,8 +22,8 @@ setup(
     description='A developer-friendly, opinionated framework for ROS 2.',
     license='Apache 2.0',
     data_files=[
-        ('share/ament_index/resource_index/packages', ['org.txt']),
-        ('share/genesys/cmake', ['genesys/genesys.cmake']),
-        ('include/genesys', ['genesys/include/genesys/macros.hpp']),
+        ('share/ament_index/resource_index/packages', ['genesys/resource/genesys']),
+        ('share/genesys/cmake', ['genesys/genesys.cmake', 'genesys/cmake/genesysConfig.cmake']),
+        ('share/genesys/include/genesys', ['genesys/include/genesys/macros.hpp']),
     ],
 )
