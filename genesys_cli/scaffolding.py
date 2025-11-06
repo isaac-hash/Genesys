@@ -179,6 +179,8 @@ def add_cpp_executable(pkg_name, node_name):
         new_find_packages.append("find_package(rclcpp REQUIRED)\n")
     if not any("find_package(std_msgs REQUIRED)" in line for line in lines):
         new_find_packages.append("find_package(std_msgs REQUIRED)\n")
+    if not any("find_package(genesys REQUIRED)" in line for line in lines):
+        new_find_packages.append("find_package(genesys REQUIRED)\n")
 
     if new_find_packages:
         # Find where to insert: after find_package(ament_cmake REQUIRED)
@@ -194,11 +196,11 @@ def add_cpp_executable(pkg_name, node_name):
     # --- Build the new executable block ---
     new_block = f'''
 add_executable({node_name} {node_src_file})
-ament_target_dependencies({node_name}
-  rclcpp
-  std_msgs
-  genesys
-)
+    ament_target_dependencies({node_name}
+      rclcpp
+      std_msgs
+    )
+target_link_libraries({node_name} PRIVATE genesys::genesys)
 
 install(TARGETS
   {node_name}
