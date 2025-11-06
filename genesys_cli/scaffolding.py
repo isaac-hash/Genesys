@@ -199,8 +199,8 @@ add_executable({node_name} {node_src_file})
     ament_target_dependencies({node_name}
       rclcpp
       std_msgs
+      genesys
     )
-target_link_libraries({node_name} PRIVATE genesys::genesys)
 
 install(TARGETS
   {node_name}
