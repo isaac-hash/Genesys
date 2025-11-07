@@ -31,12 +31,10 @@ def new(project_name):
         for subdir in subdirs:
             os.makedirs(os.path.join(workspace_root, subdir))
 
-        # Create genesys/include directory and copy macros.hpp
-        genesys_include_path = Path(workspace_root) / "src" / "genesys"
-        os.makedirs(genesys_include_path, exist_ok=True)
-        shutil.copy(
-            Path(__file__).parents[2] / "genesys" / "macros.hpp",
-            genesys_include_path / "macros.hpp",
+        # Copy genesys package
+        shutil.copytree(
+            Path(__file__).parents[2] / "genesys",
+            Path(workspace_root) / "src" / "genesys",
         )
 
         click.secho(f"✓ Project '{project_name}' created successfully.", fg="green")

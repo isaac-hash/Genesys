@@ -14,7 +14,7 @@ from genesys_cli.scaffolding import (
     add_node_to_launch,
     add_default_launch_file,
 )
-from .templates import get_python_node_template, get_cpp_node_template
+from .templates import get_python_node_template, get_cpp_node_template, get_cmakelists_template
 
 @click.group("make")
 def make():
@@ -147,15 +147,9 @@ def make_pkg(ctx, package_name, with_node, dependencies):
 
         if lang_choice.lower() == 'c++':
             cmake_path = os.path.join('src', package_name, 'CMakeLists.txt')
-            with open(cmake_path, 'r') as f:
-                content = f.read()
-
-            # Add find_package(genesys REQUIRED)
-            content = content.replace('find_package(ament_cmake REQUIRED)',
-                                      'find_package(ament_cmake REQUIRED)\nfind_package(genesys REQUIRED)')
-
+            cmakelists_content = get_cmakelists_template(package_name)
             with open(cmake_path, 'w') as f:
-                f.write(content)
+                f.write(cmakelists_content)
 
     except subprocess.CalledProcessError as e:
         click.secho(f"Error creating package '{package_name}':", fg="red")

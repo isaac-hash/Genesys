@@ -27,3 +27,14 @@ def get_cpp_node_template(node_name, class_name):
 
     template = env.get_template('publisher.cpp.j2')
     return template.render(node_name=node_name, class_name=class_name)
+
+def get_cmakelists_template(package_name):
+    """Returns the boilerplate for a CMakeLists.txt file."""
+    env = Environment(
+        loader=FileSystemLoader(os.path.join(os.path.dirname(__file__), 'templates', 'cpp')),
+        trim_blocks=True,
+        lstrip_blocks=True
+    )
+
+    template = env.get_template('cmakelists.txt.j2')
+    return template.render(package_name=package_name)
