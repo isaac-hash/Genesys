@@ -33,7 +33,7 @@ def new(project_name):
 
         # Copy genesys package
         shutil.copytree(
-            Path(__file__).parents[2] / "genesys",
+            Path(__file__).parents[2] / "genesys" / "genesys",
             Path(workspace_root) / "src" / "genesys",
         )
 
