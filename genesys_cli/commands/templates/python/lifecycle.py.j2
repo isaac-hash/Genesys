@@ -46,8 +46,8 @@ class {{ class_name }}:
         """
         msg = String()
         msg.data = f"Hello from Lifecycle Node! Message #{{self.counter}}"
-        
-        self.logger.info(f'Publishing: "{{msg.data}}"')
+        {% raw %}
+        self.logger.info(f"Publishing: {msg.data}")
+        {% endraw %}
         self.counter += 1
-        
         return msg

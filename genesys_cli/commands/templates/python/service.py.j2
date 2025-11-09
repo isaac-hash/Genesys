@@ -18,5 +18,7 @@ class {{ class_name }}:
         This method is executed whenever the 'add_two_ints' service is called.
         """
         response.sum = request.a + request.b
-        self.logger.info(f"Incoming request: a={{request.a}}, b={{request.b}}. Sending response: {{response.sum}}")
+        {% raw %}
+        self.logger.info(f"Incoming request: a={request.a}, b={request.b}. Sending response: {response.sum}")
+        {% endraw %}
         return response

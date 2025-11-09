@@ -37,5 +37,8 @@ class {{ class_name }}:
 
         result = Fibonacci.Result()
         result.sequence = sequence
-        self.logger.info(f'Returning result: {{result.sequence}}')
+        {% raw %}
+        self.logger.info(f'Returning result: {result.sequence}')
+        {% endraw %}
+
         return result
