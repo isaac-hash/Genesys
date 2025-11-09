@@ -1,14 +1,17 @@
 <?xml version="1.0"?>
 <package format="3">
-  <name>{{ package_name }}</name>
+  <name>my_robot_gazebo</name>
   <version>0.1.0</version>
-  <description>Gazebo simulation for {{ source_robot_package }}</description>
+  <description>Gazebo simulation for my_robot</description>
   <maintainer email="dev@yourcompany.com">Your Team</maintainer>
   <license>Apache-2.0</license>
-  <depend>rclcpp</depend>
-  <depend>gazebo_ros</depend>
-  <depend>{{ source_robot_package }}</depend>
-  <depend>xacro</depend>
+
+  <exec_depend>gazebo_ros</exec_depend>
+  <exec_depend>rclcpp</exec_depend>
+  <exec_depend>xacro</exec_depend>
+
+  <buildtool_depend>ament_cmake</buildtool_depend>
+
   <export>
     <build_type>ament_cmake</build_type>
   </export>

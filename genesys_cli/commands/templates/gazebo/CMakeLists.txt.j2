@@ -1,12 +1,23 @@
 cmake_minimum_required(VERSION 3.8)
 project({{ package_name }})
 
+# Core build system
 find_package(ament_cmake REQUIRED)
-find_package(rclcpp REQUIRED)
+
+# Gazebo integration
 find_package(gazebo_ros REQUIRED)
-find_package({{ source_robot_package }} REQUIRED)
 
-install(DIRECTORY launch config worlds models urdf plugins
-  DESTINATION share/${PROJECT_NAME}/)
+# Only find rclcpp if we have C++ sources
+if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/src")
+  find_package(rclcpp REQUIRED)
+  add_subdirectory(src)
+endif()
 
+
+# Install all shared resources
+install(DIRECTORY launch config worlds models urdf plugins scripts
+  DESTINATION share/${PROJECT_NAME}/
+)
+
+# Finalize package
 ament_package()

@@ -21,11 +21,9 @@ class {{ class_name }}:
         The String object it returns is automatically published to the 'chatter' topic.
         """
         msg = String()
-        msg.data = f"Hello from Genesys! Message #{{self.counter}}"
+        msg.data = f"Hello from Genesys! Message #{self.counter + 1}"
         
-        {% raw %}
         self.logger.info(f"Publishing: {msg.data}")
-        {% endraw %}
 
         self.counter += 1
         
