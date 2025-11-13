@@ -93,6 +93,8 @@ def create(package_name, from_pkg):
         'launch/main.launch.py.j2': f'launch/{package_name}.launch.py',
         'launch/spawn.launch.py.j2': f'launch/spawn_{robot_name}.launch.py',
         'config/controllers.yaml.j2': 'config/controllers.yaml',
+        'urdf/robot.urdf.j2': f'urdf/{robot_name}.urdf',
+        'worlds/default.world': 'worlds/default.world',
         'worlds/empty.world': 'worlds/empty.world'
     }
 
@@ -105,31 +107,30 @@ def create(package_name, from_pkg):
         output_path.write_text(rendered)
         click.echo(f"  Created {output_path}")
 
-    # === 4. Symlink URDF using ament_index ===
+    # === 4. Try to symlink URDF from source package, fallback to template ===
     try:
         source_urdf_path = Path(get_package_share_directory(from_pkg)) / 'urdf'
         if not source_urdf_path.exists():
             raise PackageNotFoundError(f"URDF not found in {from_pkg}")
+        
+        target_urdf = package_path / 'urdf'
+        if target_urdf.exists():
+            if target_urdf.is_symlink():
+                target_urdf.unlink()
+            else:
+                shutil.rmtree(target_urdf)
+        
+        relative_source = os.path.relpath(source_urdf_path, package_path)
+        click.echo(f"Symlinking urdf → {relative_source}")
+        try:
+            os.symlink(relative_source, target_urdf)
+        except OSError as e:
+            click.secho(f"Warning: Symlink failed: {e}", fg='yellow')
+            click.secho("  Falling back to copy...", fg='yellow')
+            shutil.copytree(source_urdf_path, target_urdf)
     except PackageNotFoundError:
-        click.secho(f"Error: Package '{from_pkg}' not found or not built.", fg='red')
-        click.secho("Run 'genesys build' and try again.", fg='yellow')
-        sys.exit(1)
-
-    target_urdf = package_path / 'urdf'
-    if target_urdf.exists():
-        if target_urdf.is_symlink():
-            target_urdf.unlink()
-        else:
-            shutil.rmtree(target_urdf)
-    
-    relative_source = os.path.relpath(source_urdf_path, package_path)
-    click.echo(f"Symlinking urdf → {relative_source}")
-    try:
-        os.symlink(relative_source, target_urdf)
-    except OSError as e:
-        click.secho(f"Warning: Symlink failed: {e}", fg='yellow')
-        click.secho("  Falling back to copy...", fg='yellow')
-        shutil.copytree(source_urdf_path, target_urdf)
+        click.secho(f"Warning: Package '{from_pkg}' not found or not built.", fg='yellow')
+        click.secho("  Using template URDF file. You can link the real one later.", fg='yellow')
 
     click.secho(f"\nPackage '{package_name}' created successfully!", fg='green')
     click.echo("Next steps:")

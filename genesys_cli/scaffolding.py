@@ -179,8 +179,8 @@ def add_cpp_executable(pkg_name, node_name):
         new_find_packages.append("find_package(rclcpp REQUIRED)\n")
     if not any("find_package(std_msgs REQUIRED)" in line for line in lines):
         new_find_packages.append("find_package(std_msgs REQUIRED)\n")
-    if not any("find_package(genesys REQUIRED)" in line for line in lines):
-        new_find_packages.append("find_package(genesys REQUIRED)\n")
+    if not any("find_package(rclcpp_lifecycle REQUIRED)" in line for line in lines):
+        new_find_packages.append("find_package(rclcpp_lifecycle REQUIRED)\n")
 
     if new_find_packages:
         # Find where to insert: after find_package(ament_cmake REQUIRED)
@@ -199,7 +199,7 @@ add_executable({node_name} {node_src_file})
     ament_target_dependencies({node_name}
       rclcpp
       std_msgs
-      genesys
+      rclcpp_lifecycle
     )
 
 install(TARGETS

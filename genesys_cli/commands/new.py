@@ -31,11 +31,6 @@ def new(project_name):
         for subdir in subdirs:
             os.makedirs(os.path.join(workspace_root, subdir))
 
-        # Copy genesys package
-        shutil.copytree(
-            Path(__file__).parents[2] / "genesys" / "genesys",
-            Path(workspace_root) / "src" / "genesys",
-        )
 
         click.secho(f"✓ Project '{project_name}' created successfully.", fg="green")
         click.echo("Next steps: 'cd {}' and start creating packages!".format(project_name))

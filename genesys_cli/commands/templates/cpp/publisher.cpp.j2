@@ -1,45 +1,43 @@
-#include "genesys/macros.hpp"
-#include "std_msgs/msg/string.hpp"
+#include <rclcpp/rclcpp.hpp>
+#include <std_msgs/msg/string.hpp>
 #include <string>
 
-// Use GEN_NODE to define the class.
-// The second argument is the node name.
-GEN_NODE({{ class_name }}, "{{ node_name }}")
+class {{ class_name }} : public rclcpp::Node
 {
-    // GEN_PARAM(member_variable, "ros_parameter_name", default_value);
-    GEN_PARAM(message_data, "message_data", std::string("Hello from Genesys C++! #"));
+public:
+    {{ class_name }}()
+        : Node("{{ node_name }}")
+    {
+        // Declare parameters
+        declare_parameter("message_data", "Hello from Genesys C++! #");
+        message_data_ = get_parameter("message_data").as_string();
 
-    // GEN_PUB(topic_name, message_type, qos_profile);
-    // The topic_name also becomes a callable function to publish.
-    GEN_PUB(chatter, std_msgs::msg::String, rclcpp::QoS(10));
+        // Create publisher
+        publisher_ = create_publisher<std_msgs::msg::String>("chatter", rclcpp::QoS(10));
 
-    // GEN_TIMER(callback_method_name, period_in_ms);
-    GEN_TIMER(on_timer, 1000);
+        // Create timer for publishing
+        timer_ = create_wall_timer(
+            std::chrono::milliseconds(1000),
+            std::bind(&{{ class_name }}::on_timer, this)
+        );
+
+        RCLCPP_INFO(get_logger(), "{{ class_name }} node started");
+    }
 
 private:
-    size_t count_ = 0;
-
-public:
-    // This is the implementation for the 'on_timer' timer.
     void on_timer()
     {
         auto message = std_msgs::msg::String();
-        message.data = message_data + std::to_string(count_++);
-        RCLCPP_INFO(this->get_logger(), "Publishing: '%s'", message.data.c_str());
-
-        // Call the publisher function created by GEN_PUB.
-        chatter(message);
+        message.data = message_data_ + std::to_string(count_++);
+        RCLCPP_INFO(get_logger(), "Publishing: '%s'", message.data.c_str());
+        publisher_->publish(message);
     }
-};
 
-// This helper macro implements the parameter setter method.
-// It must be defined after the class.
-GEN_SET_MEMBER_IMPL({{ class_name }})
-{
-    // For each GEN_PARAM, add a case here.
-    GEN_PARAM_CASE(message_data, std::string)
-}
-GEN_SET_MEMBER_END
+    rclcpp::Publisher<std_msgs::msg::String>::SharedPtr publisher_;
+    rclcpp::TimerBase::SharedPtr timer_;
+    std::string message_data_;
+    size_t count_ = 0;
+};
 
 int main(int argc, char * argv[])
 {

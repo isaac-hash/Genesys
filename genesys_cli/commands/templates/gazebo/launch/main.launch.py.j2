@@ -1,9 +1,9 @@
 from launch import LaunchDescription
-from launch.actions import IncludeLaunchDescription
+from launch.actions import ExecuteProcess, IncludeLaunchDescription
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch_ros.actions import Node
-from launch.substitutions import LaunchConfiguration, NotSubstitution
-from launch.conditions import IfCondition, UnlessCondition
+from launch.substitutions import LaunchConfiguration
+from launch.conditions import UnlessCondition
 from ament_index_python.packages import get_package_share_directory
 import os
 
@@ -14,25 +14,16 @@ def generate_launch_description():
     world_file = os.getenv('GAZEBO_WORLD', 'empty.world')
     world_path = os.path.join(pkg_share, 'worlds', world_file)
     
-    # Headless LaunchConfiguration (passed by ros2 launch --headless)
-    headless_lc = LaunchConfiguration('headless', default='false')
+    # Headless mode
+    headless = os.getenv('HEADLESS', 'false').lower() == '1'
     
     robot_name = '{{ robot_name }}'
 
-    # Gazebo Server (always runs)
-    gzserver = Node(
-        package='gazebo_ros',
-        executable='gzserver',
-        arguments=[world_path],
+    # Launch Gazebo Sim (Ignition Gazebo)
+    # This is the modern approach compatible with ROS 2 Humble and later
+    gazebo_launch = ExecuteProcess(
+        cmd=['ign', 'gazebo', '-r', world_path] + ([] if headless else []),
         output='screen'
-    )
-
-    # Gazebo Client (runs unless --headless)
-    gzclient = Node(
-        package='gazebo_ros',
-        executable='gzclient',
-        output='screen',
-        condition=UnlessCondition(headless_lc)
     )
 
     # Robot Spawner
@@ -43,7 +34,6 @@ def generate_launch_description():
     )
 
     return LaunchDescription([
-        gzserver,
-        gzclient,
+        gazebo_launch,
         spawner
     ])
