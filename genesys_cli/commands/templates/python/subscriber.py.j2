@@ -17,4 +17,7 @@ class {{ class_name }}:
         """
         This method is executed whenever a message is received on the 'chatter' topic.
         """
-        self.logger.info(f'I heard: "{{msg.data}}"')
+        {% raw %}
+        self.logger.info(f'I heard: "{msg.data}"')
+        {% endraw %}
+

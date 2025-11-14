@@ -1,28 +1,29 @@
-#include "genesys/macros.hpp"
-#include "std_msgs/msg/string.hpp"
+#include <rclcpp/rclcpp.hpp>
+#include <std_msgs/msg/string.hpp>
 
-// Use GEN_NODE to define the class.
-GEN_NODE({{ class_name }}, "{{ node_name }}")
+class {{ class_name }} : public rclcpp::Node
 {
-    // GEN_SUB(topic_name, message_type, qos_profile);
-    // This macro declares a callback method `void topic_name(std::shared_ptr<const msg_type> msg)`
-    // which you must implement.
-    GEN_SUB(chatter, std_msgs::msg::String, rclcpp::QoS(10));
+public:
+    {{ class_name }}()
+        : Node("{{ node_name }}")
+    {
+        // Create subscription
+        subscription_ = create_subscription<std_msgs::msg::String>(
+            "chatter", rclcpp::QoS(10),
+            std::bind(&{{ class_name }}::topic_callback, this, std::placeholders::_1)
+        );
+
+        RCLCPP_INFO(get_logger(), "{{ class_name }} node started");
+    }
+
+private:
+    void topic_callback(const std_msgs::msg::String & msg) const
+    {
+        RCLCPP_INFO(get_logger(), "I heard: '%s'", msg.data.c_str());
+    }
+
+    rclcpp::Subscription<std_msgs::msg::String>::SharedPtr subscription_;
 };
-
-// Implementation for the 'chatter' subscriber callback.
-void {{ class_name }}::chatter(std::shared_ptr<const std_msgs::msg::String> msg)
-{
-    RCLCPP_INFO(this->get_logger(), "I heard: '%s'", msg->data.c_str());
-}
-
-// This helper macro implements the parameter setter method.
-// It is required even if there are no parameters.
-GEN_SET_MEMBER_IMPL({{ class_name }})
-{
-    // No parameters in this example.
-}
-GEN_SET_MEMBER_END
 
 int main(int argc, char * argv[])
 {
@@ -30,4 +31,4 @@ int main(int argc, char * argv[])
     rclcpp::spin(std::make_shared<{{ class_name }}>());
     rclcpp::shutdown();
     return 0;
-}
+}}

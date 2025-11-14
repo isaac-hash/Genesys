@@ -1,44 +1,85 @@
-#include "genesys/macros.hpp"
-#include "rclcpp_lifecycle/lifecycle_publisher.hpp"
-#include "std_msgs/msg/string.hpp"
+#include <rclcpp/rclcpp.hpp>
+#include <rclcpp_lifecycle/lifecycle_node.hpp>
+#include <rclcpp_lifecycle/lifecycle_publisher.hpp>
+#include <std_msgs/msg/string.hpp>
 
-// Use GEN_LIFECYCLE_NODE to define the class.
-GEN_LIFECYCLE_NODE({{ class_name }}, "{{ node_name }}")
+class {{ class_name }} : public rclcpp_lifecycle::LifecycleNode
 {
-    // GEN_PUB works with lifecycle nodes too.
-    // The publisher will be a LifecyclePublisher and will be automatically
-    // activated and deactivated.
-    GEN_PUB(chatter, std_msgs::msg::String, rclcpp::QoS(10));
+public:
+    explicit {{ class_name }}(const rclcpp::NodeOptions& options = rclcpp::NodeOptions())
+        : rclcpp_lifecycle::LifecycleNode("{{ node_name }}", options)
+    {
+    }
 
-    // GEN_TIMER is also supported.
-    GEN_TIMER(on_timer, 1000);
+    rclcpp_lifecycle::node_interfaces::LifecycleNodeInterface::CallbackReturn
+    on_configure(const rclcpp_lifecycle::State & state)
+    {
+        (void)state;
+        RCLCPP_INFO(get_logger(), "on_configure() is called");
+
+        // Create lifecycle publisher
+        publisher_ = create_publisher<std_msgs::msg::String>(
+            "chatter", rclcpp::QoS(10)
+        );
+
+        // Create timer
+        timer_ = create_wall_timer(
+            std::chrono::milliseconds(1000),
+            std::bind(&{{ class_name }}::on_timer, this)
+        );
+
+        return rclcpp_lifecycle::node_interfaces::LifecycleNodeInterface::CallbackReturn::SUCCESS;
+    }
+
+    rclcpp_lifecycle::node_interfaces::LifecycleNodeInterface::CallbackReturn
+    on_cleanup(const rclcpp_lifecycle::State & state)
+    {
+        (void)state;
+        RCLCPP_INFO(get_logger(), "on_cleanup() is called");
+
+        timer_.reset();
+        publisher_.reset();
+
+        return rclcpp_lifecycle::node_interfaces::LifecycleNodeInterface::CallbackReturn::SUCCESS;
+    }
+
+    rclcpp_lifecycle::node_interfaces::LifecycleNodeInterface::CallbackReturn
+    on_activate(const rclcpp_lifecycle::State & state)
+    {
+        (void)state;
+        RCLCPP_INFO(get_logger(), "on_activate() is called");
+
+        return rclcpp_lifecycle::node_interfaces::LifecycleNodeInterface::CallbackReturn::SUCCESS;
+    }
+
+    rclcpp_lifecycle::node_interfaces::LifecycleNodeInterface::CallbackReturn
+    on_deactivate(const rclcpp_lifecycle::State & state)
+    {
+        (void)state;
+        RCLCPP_INFO(get_logger(), "on_deactivate() is called");
+
+        return rclcpp_lifecycle::node_interfaces::LifecycleNodeInterface::CallbackReturn::SUCCESS;
+    }
 
 private:
-    size_t count_ = 0;
-
-public:
-    // Timer callback
     void on_timer()
     {
         auto message = std_msgs::msg::String();
         message.data = "Hello from Genesys Lifecycle Node! #" + std::to_string(count_++);
-        RCLCPP_INFO(this->get_logger(), "Publishing: '%s'", message.data.c_str());
+        RCLCPP_INFO(get_logger(), "Publishing: '%s'", message.data.c_str());
 
-        // Publish the message.
-        chatter(message);
+        if (publisher_) {
+            publisher_->publish(message);
+        }
     }
-};
 
-// This helper macro implements the parameter setter method.
-GEN_SET_MEMBER_IMPL({{ class_name }})
-{
-    // No parameters in this example.
-}
-GEN_SET_MEMBER_END
+    rclcpp_lifecycle::LifecyclePublisher<std_msgs::msg::String>::SharedPtr publisher_;
+    rclcpp::TimerBase::SharedPtr timer_;
+    size_t count_ = 0;
+};
 
 int main(int argc, char * argv[])
 {
-    // force flush of the stdout buffer.
     setvbuf(stdout, NULL, _IONBF, BUFSIZ);
 
     rclcpp::init(argc, argv);
@@ -51,4 +92,4 @@ int main(int argc, char * argv[])
 
     rclcpp::shutdown();
     return 0;
-}
+}}

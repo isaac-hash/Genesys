@@ -41,12 +41,45 @@ def create(package_name, from_pkg):
 
     click.echo(f"Creating Gazebo package: {package_path}")
 
-    # === 1. Create directories ===
+    # === 1. Check & Install system dependencies (gazebo_ros, etc.) ===
+    click.echo("Checking system dependencies with rosdep...")
+    try:
+        # First: check
+        subprocess.check_call(
+            ['rosdep', 'check', '--from-paths', sim_dir, '--ignore-src'],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL
+        )
+    except subprocess.CalledProcessError:
+        click.secho("Missing system dependencies. Installing...", fg='yellow')
+        try:
+            # Now: install
+            subprocess.check_call([
+                'rosdep', 'install',
+                '--from-paths', sim_dir,
+                '--ignore-src',
+                '-y'  # auto-confirm
+            ])
+            click.secho("Dependencies installed successfully!", fg='green')
+        except subprocess.CalledProcessError as e:
+            click.secho("Failed to install dependencies.", fg='red')
+            click.secho("Run manually:", fg='yellow')
+            click.secho(f"  rosdep install --from-paths {sim_dir} --ignore-src -y", fg='cyan')
+            sys.exit(1)
+        except FileNotFoundError:
+            click.secho("'rosdep' command not found.", fg='red')
+            click.secho("Install it with: sudo apt install python3-rosdep", fg='yellow')
+            sys.exit(1)
+    except FileNotFoundError:
+        click.secho("Warning: 'rosdep' not found. Skipping dependency check.", fg='yellow')
+        click.secho("  Make sure gazebo_ros and other deps are installed.", fg='yellow')
+
+    # === 2. Create directories ===
     dirs = ["launch", "config", "worlds", "models", "urdf", "plugins", "scripts"]
     for d in dirs:
         (package_path / d).mkdir(parents=True)
 
-    # === 2. Render templates ===
+    # === 3. Render templates ===
     robot_name = package_name.replace('_gazebo', '')
     context = {
         'package_name': package_name,
@@ -60,6 +93,8 @@ def create(package_name, from_pkg):
         'launch/main.launch.py.j2': f'launch/{package_name}.launch.py',
         'launch/spawn.launch.py.j2': f'launch/spawn_{robot_name}.launch.py',
         'config/controllers.yaml.j2': 'config/controllers.yaml',
+        'urdf/robot.urdf.j2': f'urdf/{robot_name}.urdf',
+        'worlds/default.world': 'worlds/default.world',
         'worlds/empty.world': 'worlds/empty.world'
     }
 
@@ -72,36 +107,35 @@ def create(package_name, from_pkg):
         output_path.write_text(rendered)
         click.echo(f"  Created {output_path}")
 
-    # === 3. Symlink URDF using ament_index ===
+    # === 4. Try to symlink URDF from source package, fallback to template ===
     try:
         source_urdf_path = Path(get_package_share_directory(from_pkg)) / 'urdf'
         if not source_urdf_path.exists():
             raise PackageNotFoundError(f"URDF not found in {from_pkg}")
+        
+        target_urdf = package_path / 'urdf'
+        if target_urdf.exists():
+            if target_urdf.is_symlink():
+                target_urdf.unlink()
+            else:
+                shutil.rmtree(target_urdf)
+        
+        relative_source = os.path.relpath(source_urdf_path, package_path)
+        click.echo(f"Symlinking urdf → {relative_source}")
+        try:
+            os.symlink(relative_source, target_urdf)
+        except OSError as e:
+            click.secho(f"Warning: Symlink failed: {e}", fg='yellow')
+            click.secho("  Falling back to copy...", fg='yellow')
+            shutil.copytree(source_urdf_path, target_urdf)
     except PackageNotFoundError:
-        click.secho(f"Error: Package '{from_pkg}' not found or not built.", fg='red')
-        click.secho("Run 'genesys build' and try again.", fg='yellow')
-        sys.exit(1)
-
-    target_urdf = package_path / 'urdf'
-    if target_urdf.exists():
-        if target_urdf.is_symlink():
-            target_urdf.unlink()
-        else:
-            shutil.rmtree(target_urdf)
-    
-    relative_source = os.path.relpath(source_urdf_path, package_path)
-    click.echo(f"Symlinking urdf → {relative_source}")
-    try:
-        os.symlink(relative_source, target_urdf)  # Standard symlink
-    except OSError as e:
-        click.secho(f"Warning: Symlink failed (may need admin): {e}", fg='yellow')
-        click.secho("  Falling back to copy...", fg='yellow')
-        shutil.copytree(source_urdf_path, target_urdf)
+        click.secho(f"Warning: Package '{from_pkg}' not found or not built.", fg='yellow')
+        click.secho("  Using template URDF file. You can link the real one later.", fg='yellow')
 
     click.secho(f"\nPackage '{package_name}' created successfully!", fg='green')
-    click.echo("Next: Run 'genesys build' then 'genesys sim run {package_name}'")
-
-
+    click.echo("Next steps:")
+    click.echo("  1. genesys build")
+    click.echo(f"  2. genesys sim run {package_name}")
 @sim.command(name='run')
 @click.argument('package_name')
 @click.option('--world', default='empty.world', help="World file (in package's worlds/).")

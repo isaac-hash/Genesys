@@ -1,49 +1,61 @@
 from launch import LaunchDescription
-from launch.actions import IncludeLaunchDescription
+from launch.actions import IncludeLaunchDescription, DeclareLaunchArgument, SetEnvironmentVariable
 from launch.launch_description_sources import PythonLaunchDescriptionSource
-from launch_ros.actions import Node
-from launch.substitutions import LaunchConfiguration, NotSubstitution
-from launch.conditions import IfCondition, UnlessCondition
+from launch.substitutions import LaunchConfiguration
 from ament_index_python.packages import get_package_share_directory
+from launch_ros.actions import Node
 import os
 
 def generate_launch_description():
     pkg_share = get_package_share_directory('{{ package_name }}')
+    pkg_ros_gz_sim = get_package_share_directory('ros_gz_sim')
     
     # World from env var (passed by CLI)
     world_file = os.getenv('GAZEBO_WORLD', 'empty.world')
     world_path = os.path.join(pkg_share, 'worlds', world_file)
     
-    # Headless LaunchConfiguration (passed by ros2 launch --headless)
-    headless_lc = LaunchConfiguration('headless', default='false')
+    # Headless mode
+    headless = os.getenv('HEADLESS', 'false').lower() in ['true', '1']
     
     robot_name = '{{ robot_name }}'
 
-    # Gazebo Server (always runs)
-    gzserver = Node(
-        package='gazebo_ros',
-        executable='gzserver',
-        arguments=[world_path],
-        output='screen'
+    # Launch Gazebo Sim
+    gazebo_launch = IncludeLaunchDescription(
+        PythonLaunchDescriptionSource(
+            os.path.join(pkg_ros_gz_sim, 'launch', 'gz_sim.launch.py')
+        ),
+        launch_arguments={'gz_args': f'-r {world_path}'}.items()
     )
 
-    # Gazebo Client (runs unless --headless)
-    gzclient = Node(
-        package='gazebo_ros',
-        executable='gzclient',
-        output='screen',
-        condition=UnlessCondition(headless_lc)
+    # Bridge for clock
+    clock_bridge = Node(
+        package='ros_gz_bridge',
+        executable='parameter_bridge',
+        arguments=['/clock@rosgraph_msgs/msg/Clock[gz.msgs.Clock'],
+        output='screen'
     )
 
     # Robot Spawner
     spawner = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(
             os.path.join(pkg_share, 'launch', f'spawn_{robot_name}.launch.py')
-        )
+        ),
+        launch_arguments={'robot_name': robot_name}.items()
     )
-
+    
+    # Append workspace model path to GAZEBO_MODEL_PATH
+    # This ensures Gazebo finds both its default models and your custom ones.
+    workspace_model_path = os.path.join(os.getcwd(), 'sim', 'models')
+    existing_model_path = os.getenv('GAZEBO_MODEL_PATH', '')
+    
+    gazebo_model_path = SetEnvironmentVariable(
+        name='GAZEBO_MODEL_PATH',
+        value=f'{workspace_model_path}:{existing_model_path}'
+    )
+    
     return LaunchDescription([
-        gzserver,
-        gzclient,
+        gazebo_model_path,
+        gazebo_launch,
+        clock_bridge,
         spawner
     ])

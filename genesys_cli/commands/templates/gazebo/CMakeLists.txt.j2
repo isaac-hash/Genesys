@@ -1,12 +1,60 @@
 cmake_minimum_required(VERSION 3.8)
 project({{ package_name }})
 
+# Core build system
 find_package(ament_cmake REQUIRED)
-find_package(rclcpp REQUIRED)
-find_package(gazebo_ros REQUIRED)
-find_package({{ source_robot_package }} REQUIRED)
 
-install(DIRECTORY launch config worlds models urdf plugins
-  DESTINATION share/${PROJECT_NAME}/)
+# Gazebo Sim (Ignition) integration
+find_package(ros_gz_sim REQUIRED)
 
+# Only find rclcpp if we have C++ sources
+if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/src")
+  find_package(rclcpp REQUIRED)
+  add_subdirectory(src)
+endif()
+
+# Install shared resources (only those that exist)
+if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/launch")
+  install(DIRECTORY launch
+    DESTINATION share/${PROJECT_NAME}/
+  )
+endif()
+
+if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/config")
+  install(DIRECTORY config
+    DESTINATION share/${PROJECT_NAME}/
+  )
+endif()
+
+if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/worlds")
+  install(DIRECTORY worlds
+    DESTINATION share/${PROJECT_NAME}/
+  )
+endif()
+
+if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/models")
+  install(DIRECTORY models
+    DESTINATION share/${PROJECT_NAME}/
+  )
+endif()
+
+if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/urdf")
+  install(DIRECTORY urdf
+    DESTINATION share/${PROJECT_NAME}/
+  )
+endif()
+
+if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/plugins")
+  install(DIRECTORY plugins
+    DESTINATION share/${PROJECT_NAME}/
+  )
+endif()
+
+if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/scripts")
+  install(DIRECTORY scripts
+    DESTINATION share/${PROJECT_NAME}/
+  )
+endif()
+
+# Finalize package
 ament_package()
