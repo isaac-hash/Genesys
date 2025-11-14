@@ -1,35 +1,34 @@
+# {{ package_name }}/launch/spawn_{{ robot_name }}.launch.py
 from launch import LaunchDescription
-from launch_ros.actions import Node
-from launch.substitutions import LaunchConfiguration, PathJoinSubstitution
 from launch.actions import DeclareLaunchArgument
-from ament_index_python.packages import get_package_share_directory
-import os
+from launch.substitutions import LaunchConfiguration
+from launch_ros.actions import Node
 
 def generate_launch_description():
-    pkg_share = get_package_share_directory('{{ package_name }}')
+    # ------------------------------------------------------------------ #
+    #  Launch arguments
+    # ------------------------------------------------------------------ #
+    declare_robot_name = DeclareLaunchArgument(
+        'robot_name', default_value='{{ robot_name }}'
+    )
+    declare_x = DeclareLaunchArgument('x', default_value='0.0')
+    declare_y = DeclareLaunchArgument('y', default_value='0.0')
+    declare_z = DeclareLaunchArgument('z', default_value='0.1')
 
-    # Declare launch arguments
-    robot_name_arg = DeclareLaunchArgument('robot_name', default_value='{{ robot_name }}')
-    x_arg = DeclareLaunchArgument('x', default_value='0.0')
-    y_arg = DeclareLaunchArgument('y', default_value='0.0')
-    z_arg = DeclareLaunchArgument('z', default_value='0.1')
-
-    # Use the launch arguments
     robot_name = LaunchConfiguration('robot_name')
     x = LaunchConfiguration('x')
     y = LaunchConfiguration('y')
     z = LaunchConfiguration('z')
 
-    # Construct the full path to the URDF file
-    urdf_file_path = PathJoinSubstitution([pkg_share, 'urdf', PathJoinSubstitution([robot_name, '.urdf.xacro'])])
-
-    # For Gazebo Sim (Ignition), use the spawn_entity.py script
-    spawn_node = Node(
+    # ------------------------------------------------------------------ #
+    #  Spawn robot in Gazebo (robot_description should already be published)
+    # ------------------------------------------------------------------ #
+    spawn_entity_node = Node(
         package='ros_gz_sim',
         executable='create',
         arguments=[
-            '-name', robot_name, # The name of the robot in the simulation
-            '-topic', 'robot_description', # The topic where the URDF is published
+            '-name', robot_name,
+            '-topic', 'robot_description',
             '-x', x,
             '-y', y,
             '-z', z
@@ -37,10 +36,13 @@ def generate_launch_description():
         output='screen'
     )
 
+    # ------------------------------------------------------------------ #
+    #  LaunchDescription
+    # ------------------------------------------------------------------ #
     return LaunchDescription([
-        robot_name_arg,
-        x_arg,
-        y_arg,
-        z_arg,
-        spawn_node
+        declare_robot_name,
+        declare_x,
+        declare_y,
+        declare_z,
+        spawn_entity_node
     ])

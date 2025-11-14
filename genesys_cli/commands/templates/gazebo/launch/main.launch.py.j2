@@ -1,61 +1,102 @@
 from launch import LaunchDescription
-from launch.actions import IncludeLaunchDescription, DeclareLaunchArgument, SetEnvironmentVariable
+from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription, SetEnvironmentVariable
 from launch.launch_description_sources import PythonLaunchDescriptionSource
-from launch.substitutions import LaunchConfiguration
-from ament_index_python.packages import get_package_share_directory
+from launch.substitutions import LaunchConfiguration, PathJoinSubstitution
 from launch_ros.actions import Node
+from launch_ros.substitutions import FindPackageShare
 import os
 
-def generate_launch_description():
-    pkg_share = get_package_share_directory('{{ package_name }}')
-    pkg_ros_gz_sim = get_package_share_directory('ros_gz_sim')
-    
-    # World from env var (passed by CLI)
-    world_file = os.getenv('GAZEBO_WORLD', 'empty.world')
-    world_path = os.path.join(pkg_share, 'worlds', world_file)
-    
-    # Headless mode
-    headless = os.getenv('HEADLESS', 'false').lower() in ['true', '1']
-    
-    robot_name = '{{ robot_name }}'
 
-    # Launch Gazebo Sim
-    gazebo_launch = IncludeLaunchDescription(
-        PythonLaunchDescriptionSource(
-            os.path.join(pkg_ros_gz_sim, 'launch', 'gz_sim.launch.py')
-        ),
-        launch_arguments={'gz_args': f'-r {world_path}'}.items()
+def generate_launch_description():
+    # ------------------------------------------------------------------ #
+    # Packages
+    # ------------------------------------------------------------------ #
+    pkg_robot = FindPackageShare('{{ package_name }}')
+    pkg_ros_gz_sim = FindPackageShare('ros_gz_sim')
+
+    # ------------------------------------------------------------------ #
+    # Launch arguments
+    # ------------------------------------------------------------------ #
+    robot_name_arg   = DeclareLaunchArgument('robot_name', default_value='{{ robot_name }}')
+    world_file_arg   = DeclareLaunchArgument('world_file', default_value='empty.world')
+    x_arg            = DeclareLaunchArgument('x', default_value='0.0')
+    y_arg            = DeclareLaunchArgument('y', default_value='0.0')
+    z_arg            = DeclareLaunchArgument('z', default_value='0.1')
+    use_sim_time_arg = DeclareLaunchArgument('use_sim_time', default_value='true')
+
+    robot_name   = LaunchConfiguration('robot_name')
+    world_file   = LaunchConfiguration('world_file')
+    x            = LaunchConfiguration('x')
+    y            = LaunchConfiguration('y')
+    z            = LaunchConfiguration('z')
+    use_sim_time = LaunchConfiguration('use_sim_time')
+
+    # ------------------------------------------------------------------ #
+    # World path
+    # ------------------------------------------------------------------ #
+    world_path = PathJoinSubstitution([pkg_robot, 'worlds', world_file])
+
+    # ------------------------------------------------------------------ #
+    # Gazebo model path
+    # ------------------------------------------------------------------ #
+    gazebo_model_path = SetEnvironmentVariable(
+        name='GAZEBO_MODEL_PATH',
+        value=[
+            PathJoinSubstitution([os.getcwd(), 'sim', 'models']),
+            os.path.expanduser('~/.gazebo/models'),
+            os.getenv('GAZEBO_MODEL_PATH', '')
+        ]
     )
 
-    # Bridge for clock
+    # ------------------------------------------------------------------ #
+    # Launch Gazebo
+    # ------------------------------------------------------------------ #
+    gz_launch_file = PathJoinSubstitution([pkg_ros_gz_sim, 'launch', 'gz_sim.launch.py'])
+    gazebo = IncludeLaunchDescription(
+        PythonLaunchDescriptionSource(gz_launch_file),
+        launch_arguments={'gz_args': ['-r ', world_path]}.items()
+    )
+
+    # ------------------------------------------------------------------ #
+    # Clock bridge
+    # ------------------------------------------------------------------ #
     clock_bridge = Node(
         package='ros_gz_bridge',
         executable='parameter_bridge',
-        arguments=['/clock@rosgraph_msgs/msg/Clock[gz.msgs.Clock'],
+        arguments=['/clock@rosgraph_msgs/msg/Clock[gz.msgs.Clock]'],
         output='screen'
     )
 
-    # Robot Spawner
-    spawner = IncludeLaunchDescription(
-        PythonLaunchDescriptionSource(
-            os.path.join(pkg_share, 'launch', f'spawn_{robot_name}.launch.py')
-        ),
-        launch_arguments={'robot_name': robot_name}.items()
+    # ------------------------------------------------------------------ #
+    # Spawn robot
+    # ------------------------------------------------------------------ #
+    # Hardcode the actual spawn launch filename, do NOT use LaunchConfiguration here
+    spawn_launch_file = PathJoinSubstitution([
+        pkg_robot, 'launch', 'spawn_{{ robot_name }}.launch.py'
+    ])
+    spawn_robot = IncludeLaunchDescription(
+        PythonLaunchDescriptionSource(spawn_launch_file),
+        launch_arguments={
+            'robot_name':   robot_name,
+            'x':            x,
+            'y':            y,
+            'z':            z,
+            'use_sim_time': use_sim_time
+        }.items()
     )
-    
-    # Append workspace model path to GAZEBO_MODEL_PATH
-    # This ensures Gazebo finds both its default models and your custom ones.
-    workspace_model_path = os.path.join(os.getcwd(), 'sim', 'models')
-    existing_model_path = os.getenv('GAZEBO_MODEL_PATH', '')
-    
-    gazebo_model_path = SetEnvironmentVariable(
-        name='GAZEBO_MODEL_PATH',
-        value=f'{workspace_model_path}:{existing_model_path}'
-    )
-    
+
+    # ------------------------------------------------------------------ #
+    # Final LaunchDescription
+    # ------------------------------------------------------------------ #
     return LaunchDescription([
+        robot_name_arg,
+        world_file_arg,
+        x_arg,
+        y_arg,
+        z_arg,
+        use_sim_time_arg,
         gazebo_model_path,
-        gazebo_launch,
+        gazebo,
         clock_bridge,
-        spawner
+        spawn_robot
     ])

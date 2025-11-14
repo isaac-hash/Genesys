@@ -95,7 +95,6 @@ def create(package_name, from_pkg):
         'config/controllers.yaml.j2': 'config/controllers.yaml',
         'urdf/robot.urdf.j2': f'urdf/{robot_name}.urdf',
         'worlds/default.world': 'worlds/default.world',
-        'worlds/empty.world': 'worlds/empty.world'
     }
 
     for tmpl, output in templates.items():
@@ -106,6 +105,26 @@ def create(package_name, from_pkg):
         rendered = content if not tmpl.endswith('.j2') else _render_template(content, context)
         output_path.write_text(rendered)
         click.echo(f"  Created {output_path}")
+
+    # === 3b. Dynamically generate empty.world with user's home path ===
+    worlds_dir = package_path / 'worlds'
+    empty_world_path = worlds_dir / 'empty.world'
+    home_dir = os.path.expanduser("~")
+    empty_world_content = f"""<?xml version="1.0" ?>
+    <sdf version="1.6">
+    <world name="empty">
+        <include>
+        <uri>file://{home_dir}/.gazebo/models/ground_plane</uri>
+        </include>
+        <include>
+        <uri>file://{home_dir}/.gazebo/models/sun</uri>
+        </include>
+    </world>
+    </sdf>
+    """
+    empty_world_path.write_text(empty_world_content)
+    click.echo(f"  Created dynamic world file: {empty_world_path}")
+
 
     # === 4. Try to symlink URDF from source package, fallback to template ===
     try:
@@ -136,6 +155,10 @@ def create(package_name, from_pkg):
     click.echo("Next steps:")
     click.echo("  1. genesys build")
     click.echo(f"  2. genesys sim run {package_name}")
+
+
+
+
 @sim.command(name='run')
 @click.argument('package_name')
 @click.option('--world', default='empty.world', help="World file (in package's worlds/).")

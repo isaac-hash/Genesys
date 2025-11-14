@@ -4,7 +4,6 @@ NOTICE.txt
 README.md
 org.txt
 pyproject.toml
-setup.py
 genesys/__init__.py
 genesys/decorators.py
 genesys/genesys.cmake

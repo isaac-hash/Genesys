@@ -6,7 +6,7 @@ build-backend = "setuptools.build_meta"
 name = "genesys_framework_cli"
 version = "0.1.5"
 authors = [
-  { name="Chukwudulue Isaac", email="zikkychukwudulue@gmail.com" },
+  { name = "Chukwudulue Isaac", email = "zikkychukwudulue@gmail.com" }
 ]
 description = "A developer-friendly, opinionated framework for ROS 2."
 readme = "README.md"
@@ -14,10 +14,11 @@ requires-python = ">=3.8"
 classifiers = [
     "Programming Language :: Python :: 3",
     "License :: OSI Approved :: Apache Software License",
-    "Operating System :: OS Independent",
+    "Operating System :: OS Independent"
 ]
 dependencies = [
     "click",
+    "Jinja2"
 ]
 
 [project.scripts]
