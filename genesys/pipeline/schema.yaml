@@ -1,0 +1,31 @@
+pipeline:
+  name: vision
+  nodes:
+    - id: camera
+      package: my_pkg
+      plugin: camera
+      publish: raw_image
+      parameters:
+        - name: camera_id
+          value: 0
+        - name: frame_rate
+          value: 30.0
+    - id: gray_filter
+      package: my_pkg
+      plugin: gray_filter
+      subscribe: raw_image
+      publish: gray_image
+      remap:
+        /raw_image: /vision/camera/raw_image # Example of remapping
+    - id: edge_detector
+      package: my_pkg
+      executable: edge_detector_node # Example of a regular node
+      subscribe: gray_image
+      publish: edges
+      parameters:
+        - name: threshold
+          value: 50
+        - name: kernel_size
+          value: 3
+      remap:
+        /gray_image: /vision/gray_filter/gray_image # Example of remapping

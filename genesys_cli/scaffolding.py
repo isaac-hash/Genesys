@@ -97,6 +97,68 @@ def add_python_entry_point(pkg_name, node_name):
     
     click.secho(f"✓ Registered '{node_name}' in {setup_file}", fg="green")
 
+def add_python_component_entry_point(pkg_name, component_name):
+    """Adds a new rclpy_components entry to a package's setup.py file."""
+    setup_file = os.path.join('src', pkg_name, 'setup.py')
+    component_module_name = component_name.replace('.py', '')
+
+    with open(setup_file, 'r') as f:
+        content = f.read()
+
+    # Check if rclpy_components entry point exists, if not, add it.
+    if 'rclpy_components' not in content:
+        entry_points_match = re.search(r'entry_points\s*=\s*\{', content)
+        if not entry_points_match:
+            click.secho(f"Error: Could not find 'entry_points' in {setup_file}.", fg="red")
+            return
+        
+        insertion_point = entry_points_match.end()
+        new_entry_point = """
+    'rclpy_components': [],
+"""
+        content = content[:insertion_point] + new_entry_point + content[insertion_point:]
+
+    # Use re.DOTALL to match newlines. Use named groups for clarity.
+    match = re.search(
+        r'(?P<pre>(["\'])rclpy_components\2\s*:\s*\[)(?P<scripts>.*?)(?P<post>\])',
+        content,
+        re.DOTALL
+    )
+
+    if not match:
+        click.secho(f"Error: Could not find 'rclpy_components' in {setup_file}.", fg="red")
+        return
+
+    scripts_content = match.group('scripts')
+
+    # Check if component is already registered
+    if f"'{component_name} ='" in scripts_content or f'"{component_name} ="' in scripts_content:
+        click.secho(f"Component '{component_name}' already exists in {setup_file}.", fg="yellow")
+        return
+
+    # Always add a comma at the end for consistency, making it easier to append new entries.
+    new_entry = f"'{component_name} = {pkg_name}.{component_module_name}:get_node_factory',"
+
+    # Determine indentation from the line before the closing bracket
+    pre_match_line_start = content.rfind('\n', 0, match.end('scripts')) + 1
+    indentation = " " * (match.start('scripts') - pre_match_line_start)
+
+    # If the list is not empty, add a newline before the new entry.
+    if scripts_content.strip():
+        insertion = f"\n{indentation}{new_entry}"
+    else: # The list is empty, add indentation and newlines around it.
+        indentation += "    " # Add extra indent for the first item
+        insertion = f"\n{indentation}{new_entry}\n{indentation[:-4]}"
+
+    # Insert the new entry right before the closing bracket of the list.
+    insertion_point = match.end('scripts')
+    updated_content = content[:insertion_point] + insertion + content[insertion_point:]
+
+    with open(setup_file, 'w') as f:
+        f.write(updated_content)
+    
+    click.secho(f"✓ Registered '{component_name}' as a component in {setup_file}", fg="green")
+
 def add_install_rule_for_launch_dir(pkg_name):
     """Adds the install rule for the launch directory to setup.py."""
     setup_file = os.path.join('src', pkg_name, 'setup.py')
@@ -312,6 +374,66 @@ def add_node_to_launch(pkg_name, node_name):
         f.write(updated_content)
 
     click.secho(f"✓ Added '{node_name}' to launch file: {launch_file}", fg="green")
+
+def add_node_to_mixed_launch(pkg_name, node_name):
+    """Adds a new Node entry into the package's mixed launch file if it exists."""
+    launch_file = os.path.join('src', pkg_name, 'launch', "mixed_launch.py")
+    if not os.path.exists(launch_file):
+        return
+
+    with open(launch_file, 'r') as f:
+        content = f.read()
+
+    new_node_block = f"""        Node(
+            package='{pkg_name}',
+            executable='{node_name}',
+            name='{node_name}'
+        ),
+"""
+
+    if f"executable='{node_name}'" in content:
+        click.secho(f"Launch file already contains '{node_name}'.", fg="yellow")
+        return
+
+    # Insert the new node block into the regular_nodes list.
+    updated_content = re.sub(r"(regular_nodes\s*=\s*\[\n)",
+                           rf"\g<1>{new_node_block}",
+                           content)
+
+    with open(launch_file, 'w') as f:
+        f.write(updated_content)
+
+    click.secho(f"✓ Added '{node_name}' to mixed launch file: {launch_file}", fg="green")
+
+def add_component_to_mixed_launch(pkg_name, component_name):
+    """Adds a new ComposableNode entry into the package's mixed launch file if it exists."""
+    launch_file = os.path.join('src', pkg_name, 'launch', "mixed_launch.py")
+    if not os.path.exists(launch_file):
+        return
+
+    with open(launch_file, 'r') as f:
+        content = f.read()
+
+    new_component_block = f"""        ComposableNode(
+            package='{pkg_name}',
+            plugin='{component_name}',
+            name='{component_name}'
+        ),
+"""
+
+    if f"plugin='{component_name}'" in content:
+        click.secho(f"Launch file already contains '{component_name}'.", fg="yellow")
+        return
+
+    # Insert the new component block into the composable_nodes list.
+    updated_content = re.sub(r"(composable_nodes\s*=\s*\[\n)",
+                           rf"\g<1>{new_component_block}",
+                           content)
+
+    with open(launch_file, 'w') as f:
+        f.write(updated_content)
+
+    click.secho(f"✓ Added '{component_name}' to mixed launch file: {launch_file}", fg="green")
 
 def add_default_launch_file(pkg_name):
     """Auto-generates a default.launch.py that includes the main package launch file."""

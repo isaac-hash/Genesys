@@ -1,0 +1,34 @@
+from launch import LaunchDescription
+from launch_ros.actions import Node, ComposableNodeContainer
+from launch_ros.descriptions import ComposableNode
+
+def generate_launch_description():
+    
+    regular_nodes = [
+        # Add regular nodes here
+        # Node(
+        #     package='pkg',
+        #     executable='regular_exec',
+        #     name='regular'
+        # ),
+    ]
+
+    composable_nodes = [
+        # Add composable nodes here
+        # ComposableNode(
+        #     package='pkg', 
+        #     plugin='plugin_name', 
+        #     name='component_name'
+        # ),
+    ]
+
+    container = ComposableNodeContainer(
+        name='component_container',
+        namespace='',
+        package='rclpy_components',
+        executable='component_container',
+        composable_node_descriptions=composable_nodes,
+        output='screen',
+    )
+
+    return LaunchDescription(regular_nodes + [container])

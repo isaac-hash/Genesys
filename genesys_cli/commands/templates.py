@@ -17,6 +17,28 @@ def get_python_node_template(node_type, node_name, class_name):
 
     return f"{node_content}\n{main_content}"
 
+def get_python_component_template(component_name, class_name):
+    """Returns the boilerplate for a Python component."""
+    env = Environment(
+        loader=FileSystemLoader(os.path.join(os.path.dirname(__file__), 'templates', 'python')),
+        trim_blocks=True,
+        lstrip_blocks=True
+    )
+
+    template = env.get_template("component.py.j2")
+    return template.render(node_name=component_name, class_name=class_name)
+
+def get_mixed_launch_template():
+    """Returns the boilerplate for a mixed launch file."""
+    env = Environment(
+        loader=FileSystemLoader(os.path.join(os.path.dirname(__file__), 'templates', 'launch')),
+        trim_blocks=True,
+        lstrip_blocks=True
+    )
+
+    template = env.get_template("mixed_launch.py.j2")
+    return template.render()
+
 def get_cpp_node_template(node_name, class_name):
     """Returns the boilerplate for a C++ node."""
     env = Environment(
