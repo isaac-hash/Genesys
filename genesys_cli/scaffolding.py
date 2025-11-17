@@ -500,3 +500,109 @@ def add_cpp_dependencies_to_package_xml(pkg_name, dependencies):
         with open(package_xml_file, 'w') as f:
             f.write(updated_content)
         click.secho(f"✓ Added dependencies to {package_xml_file}", fg="green")
+
+def add_component_to_regular_launch(pkg_name, component_name):
+    """
+    Adds a new ComposableNode entry into the package's regular launch file (pkg_name_launch.py).
+    If a ComposableNodeContainer is not present, it will be added.
+    """
+    launch_file = os.path.join('src', pkg_name, 'launch', f"{pkg_name}_launch.py")
+    if not os.path.exists(launch_file):
+        click.secho(f"Error: Regular launch file '{launch_file}' not found.", fg="red")
+        return
+
+    with open(launch_file, 'r') as f:
+        content = f.read()
+
+    # Check if component is already registered
+    if f"plugin='{component_name}'" in content:
+        click.secho(f"Launch file already contains '{component_name}'.", fg="yellow")
+        return
+
+    # Imports to ensure are present
+    imports_to_add = []
+    if 'from launch_ros.actions import ComposableNodeContainer' not in content:
+        imports_to_add.append('from launch_ros.actions import ComposableNodeContainer')
+    if 'from launch_ros.descriptions import ComposableNode' not in content:
+        imports_to_add.append('from launch_ros.descriptions import ComposableNode')
+    
+    if imports_to_add:
+        # Find a good place to insert imports, e.g., after existing launch imports
+        match_launch_import = re.search(r'(from launch import LaunchDescription)', content)
+        if match_launch_import:
+            insertion_point = match_launch_import.end()
+            content = content[:insertion_point] + "\n" + "\n".join(imports_to_add) + content[insertion_point:]
+        else:
+            # Fallback if no launch import found, add at top
+            content = "\n".join(imports_to_add) + "\n" + content
+
+    # Check if a ComposableNodeContainer already exists
+    container_match = re.search(r'ComposableNodeContainer\(', content)
+    
+    new_component_block = f"""        ComposableNode(
+            package='{pkg_name}',
+            plugin='{component_name}',
+            name='{component_name}'
+        ),
+"""
+
+    if container_match:
+        # Container exists, find its composable_node_descriptions list and insert
+        match = re.search(
+            r'(composable_node_descriptions\s*=\s*\[)(?P<nodes>.*?)(?P<post>\])',
+            content,
+            re.DOTALL
+        )
+        if match:
+            scripts_content = match.group('nodes')
+            insertion_point = match.end('nodes')
+            
+            # Determine indentation
+            pre_match_line_start = content.rfind('\n', 0, match.end('nodes')) + 1
+            indentation = " " * (match.start('nodes') - pre_match_line_start)
+
+            if scripts_content.strip():
+                insertion = f"\n{indentation}{new_component_block}"
+            else:
+                insertion = f"\n{indentation}    {new_component_block}\n{indentation}"
+
+            content = content[:insertion_point] + insertion + content[insertion_point:]
+        else:
+            click.secho(f"Warning: Could not find 'composable_node_descriptions' in existing container in {launch_file}. Component not added.", fg="yellow")
+            return
+    else:
+        # No container, add a new one and the component
+        container_block = f"""
+    container = ComposableNodeContainer(
+        name='{pkg_name}_component_container',
+        namespace='',
+        package='rclpy_components',
+        executable='component_container',
+        composable_node_descriptions=[
+{new_component_block}
+        ],
+        output='screen',
+    )
+"""
+        # Find the return LaunchDescription([ and insert container before it
+        match_return = re.search(r'(return LaunchDescription\(\[)(?P<nodes>.*?)(?P<post>\]\))', content, re.DOTALL)
+        if match_return:
+            insertion_point = match_return.end('nodes')
+            nodes_in_ld = match_return.group('nodes').strip()
+            
+            if nodes_in_ld:
+                # Add comma if there are existing nodes
+                content = content[:insertion_point] + ",\n        container" + content[insertion_point:]
+            else:
+                content = content[:insertion_point] + "\n        container" + content[insertion_point:]
+            
+            # Insert the container block itself before the return statement
+            content = content[:match_return.start()] + container_block + content[match_return.start():]
+        else:
+            click.secho(f"Warning: Could not find 'return LaunchDescription' in {launch_file}. Component container not added.", fg="yellow")
+            return
+
+    with open(launch_file, 'w') as f:
+        f.write(content)
+
+    click.secho(f"✓ Added '{component_name}' to regular launch file: {launch_file}", fg="green")

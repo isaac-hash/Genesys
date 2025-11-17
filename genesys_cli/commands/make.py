@@ -16,6 +16,7 @@ from genesys_cli.scaffolding import (
     add_node_to_mixed_launch,
     add_component_to_mixed_launch,
     add_default_launch_file,
+    add_component_to_regular_launch,
 )
 from .templates import get_python_node_template, get_python_component_template, get_mixed_launch_template, get_cpp_node_template, get_cmakelists_template
 
@@ -182,7 +183,23 @@ def make_component(ctx, component_name, pkg_name):
             f.write(py_boilerplate)
         click.secho(f"✓ Created Python component file: {comp_file}", fg="green")
         add_python_component_entry_point(pkg_name, component_name)
-        add_component_to_mixed_launch(pkg_name, component_name)
+        
+        mixed_launch_file_path = os.path.join(pkg_path, 'launch', 'mixed_launch.py')
+        regular_launch_file_path = os.path.join(pkg_path, 'launch', f"{pkg_name}_launch.py")
+
+        if os.path.exists(mixed_launch_file_path):
+            click.secho(f"Mixed launch file found for '{pkg_name}'. Adding component...", fg="green")
+            add_component_to_mixed_launch(pkg_name, component_name)
+            add_default_launch_file(pkg_name) # Ensure default launch file includes the mixed launch
+        elif os.path.exists(regular_launch_file_path):
+            click.secho(f"Regular launch file found for '{pkg_name}'. Adding component to it...", fg="green")
+            add_component_to_regular_launch(pkg_name, component_name)
+            add_default_launch_file(pkg_name) # Ensure default launch file includes the regular launch
+        else:
+            click.secho(f"No existing launch file found for '{pkg_name}'. Creating a mixed launch file...", fg="yellow")
+            ctx.invoke(make_launch, pkg_name=pkg_name, launch_name='mixed_launch')
+            add_component_to_mixed_launch(pkg_name, component_name)
+            add_default_launch_file(pkg_name) # Ensure default launch file includes the mixed launch
     else:
         click.secho(f"Error: Could not determine package type for '{pkg_name}'. No setup.py found.", fg="red")
         sys.exit(1)
