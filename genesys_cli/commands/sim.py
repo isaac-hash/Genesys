@@ -23,7 +23,7 @@ def _get_template_path(template_name):
 
 @sim.command()
 @click.argument('package_name', callback=lambda ctx, param, value: value.lower())
-@click.option('--from', 'from_pkg', required=True, help='Source robot description package (e.g., ur_description).')
+@click.option('--pkg', 'from_pkg', required=True, help='Source robot description package (e.g., ur_description).')
 def create(package_name, from_pkg):
     """Creates a new *_gazebo package in sim/ for a robot."""
     

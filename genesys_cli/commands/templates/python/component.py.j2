@@ -20,8 +20,12 @@ class {{ class_name }}(NodeBase):
         super().__init__("{{ node_name }}", self)
         # The logger is automatically available after super().__init__
         self.get_logger().info("{{ class_name }} component initialized.")
-        {% if component_type == 'publisher' %}self.counter = 0{% endif %}
-        {% if component_type == 'actionserver' %}self._action_server = None{% endif %}
+        {% if component_type == 'publisher' %}
+        self.counter = 0
+        {% endif %}
+        {% if component_type == 'actionserver' %}
+        self._action_server = None
+        {% endif %}
 
     {% if component_type == 'publisher' %}
     @publisher(topic="chatter", msg_type=String)

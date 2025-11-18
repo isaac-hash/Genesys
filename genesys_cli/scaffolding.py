@@ -619,13 +619,14 @@ def add_component_to_regular_launch(pkg_name, component_name):
             return
     else:
         # No container, add a new one and the component
+        indented_component_block = new_component_block.replace('\n', '\n        ').strip()
         container_block = f"""container = ComposableNodeContainer(
     name='{pkg_name}_component_container',
     namespace='',
     package='rclpy_components',
     executable='component_container',
     composable_node_descriptions=[
-        {new_component_block.replace('\n', '\n        ').strip()}
+        {indented_component_block}
     ],
     output='screen',
 )"""
