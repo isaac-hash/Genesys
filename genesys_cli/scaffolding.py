@@ -2,6 +2,7 @@ import os
 import re
 import click
 import sys
+from genesys_cli.commands.templates import get_cpp_component_templates
 
 def persist_workspace_sourcing():
     """Appends the workspace sourcing command to the user's shell startup file."""
