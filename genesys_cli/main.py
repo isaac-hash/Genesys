@@ -9,6 +9,7 @@ from genesys_cli.commands.ros import node, topic, service, action, param
 from genesys_cli.commands.rqt import rqt
 from genesys_cli.commands.run import run
 from genesys_cli.commands.sim import sim
+from genesys_cli.commands.pipeline import pipeline
 
 @click.group()
 def cli():
@@ -24,6 +25,7 @@ cli.add_command(make)
 cli.add_command(new)
 cli.add_command(run)
 cli.add_command(sim)
+cli.add_command(pipeline)
 
 # Add command groups
 cli.add_command(node)

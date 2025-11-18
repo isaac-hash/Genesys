@@ -104,6 +104,8 @@ This workflow demonstrates the "happy path" for creating a new project from scra
 | `genesys new <project_name>` | Creates a new, structured ROS 2 workspace. |
 | `genesys make pkg <pkg_name>` | Interactively creates a new Python or C++ package in `src/`. |
 | `genesys make node <node_name> --pkg <pkg>` | Creates a new node with interactive type selection and registers it within an existing package. |
+| `genesys make component <comp_name> --pkg <pkg>` | Creates a new component and registers it within an existing package. |
+| `genesys make launch --pkg <pkg>` | Creates a new mixed launch file. |
 | `genesys make interface` | Scaffolds custom message, service, and action files. |
 | `genesys build` | Builds the entire workspace using `colcon` and sources the environment. |
 
@@ -114,6 +116,13 @@ This workflow demonstrates the "happy path" for creating a new project from scra
 | `genesys launch <pkg>[:<file>]` | Launches a package's default launch file or a specific one. |
 | `genesys launch --all` | Launches the `default.launch.py` from all packages in the workspace. |
 | `genesys sim <world_file>` | Starts a Gazebo simulation with the specified world and a robot model. |
+
+### Pipeline Management
+| Command | Description |
+| ----------------------------------------- | -------------------------------------------------------------------------------------- |
+| `genesys pipeline create <name>` | Creates a new pipeline YAML file. |
+| `genesys pipeline run <file>` | Runs a pipeline from a YAML file. |
+| `genesys pipeline watch <file>` | (Not Implemented) Monitors a pipeline and automatically reloads changed components. |
 
 ### ROS 2 Tooling
 | Command | Description |

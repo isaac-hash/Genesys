@@ -1,0 +1,45 @@
+name: Genesys CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build_and_test:
+    runs-on: ubuntu-latest
+    container: ros:humble-ros-base  # ROS 2 Humble Docker image
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up Python 3.10
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+          cache: 'pip'
+
+      - name: Upgrade pip and install dependencies
+        run: |
+          python3 -m pip install --upgrade pip
+          python3 -m pip install -e .
+          python3 -m pip install pytest pylint
+
+      - name: Lint with Pylint
+        run: pylint genesys genesys_cli tests
+
+      - name: Run Unit Tests with Pytest
+        run: pytest tests/unit
+
+      - name: Colcon Build
+        run: |
+          source /opt/ros/humble/setup.bash
+          colcon build --packages-select genesys genesys_cli --symlink-install
+
+      - name: Run Integration Tests
+        run: |
+          source /opt/ros/humble/setup.bash
+          source install/setup.bash
+          pytest tests/integration
