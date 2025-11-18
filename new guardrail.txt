@@ -1,0 +1,151 @@
+{
+  "stark_cpp_component_system": {
+    "goal": "Provide full scaffolding, build integration, and pipeline tooling for C++ ROS2 components without decorators",
+
+    "features": {
+      "component_scaffolding": {
+        "description": "Generate all files needed for a ROS2 C++ component node",
+        "cli": "stark make:component <Name> --pkg <Package>",
+        "generated_files": [
+          "include/<pkg>/<Name>.hpp",
+          "src/<Name>.cpp",
+          "src/register_components.cpp",
+          "resource/<pkg>_plugin.xml"
+        ],
+        "auto_updates": [
+          "CMakeLists.txt target + pluginlib export",
+          "package.xml export tag insertion"
+        ],
+        "node_structure": {
+          "inherits": "rclcpp::Node",
+          "constructor_input": "const rclcpp::NodeOptions& options",
+          "members": [
+            "publishers",
+            "subscribers",
+            "timers",
+            "internal state variables"
+          ]
+        }
+      },
+
+      "pipeline_system": {
+        "description": "Chain multiple components together inside a component_container",
+        "definition_format": "pipelines/<pipeline_name>.yaml",
+        "pipeline_yaml_structure": {
+          "pipeline": {
+            "name": "example_pipeline",
+            "container": "example_container",
+            "stages": [
+              {
+                "component": "<pkg>::<ComponentA>",
+                "node_name": "stage_a",
+                "parameters": {}
+              },
+              {
+                "component": "<pkg>::<ComponentB>",
+                "node_name": "stage_b",
+                "parameters": {}
+              }
+            ]
+          }
+        },
+        "launch_generation": {
+          "cli": "stark build:pipeline <pipeline_name>",
+          "output": "launch/<pipeline_name>.launch.py",
+          "launch_contents": {
+            "container_type": "rclcpp_components::ComposableNodeContainer",
+            "node_loading_style": "ComposableNode descriptions list",
+            "intra_process": true,
+            "load_each_stage": true
+          }
+        }
+      }
+    },
+
+    "cli_commands": {
+      "make_component": {
+        "command": "stark make:component <Name> --pkg <Package>",
+        "results": "Creates all component boilerplate files and updates build system"
+      },
+      "generate_pipeline": {
+        "command": "stark generate:pipeline <pipeline_name>",
+        "results": "Creates an editable pipeline.yaml with empty stages"
+      },
+      "build_pipeline": {
+        "command": "stark build:pipeline <pipeline_name>",
+        "results": "Creates launch file that loads all components into a container"
+      }
+    },
+
+    "file_templates": {
+      "component_header": {
+        "path": "include/<pkg>/<Name>.hpp",
+        "contains": [
+          "#pragma once",
+          "#include <rclcpp/rclcpp.hpp>",
+          "class <Name> : public rclcpp::Node { ... };"
+        ]
+      },
+      "component_source": {
+        "path": "src/<Name>.cpp",
+        "contains": [
+          "#include \"<pkg>/<Name>.hpp\"",
+          "<Name>::<Name>(const rclcpp::NodeOptions& options)",
+          "{ constructor initialization }"
+        ]
+      },
+      "component_registration": {
+        "path": "src/register_components.cpp",
+        "contains": [
+          "#include \"<pkg>/<Name>.hpp\"",
+          "RCLCPP_COMPONENTS_REGISTER_NODE(<pkg>::<Name>)"
+        ]
+      },
+      "plugin_xml": {
+        "path": "resource/<pkg>_plugin.xml",
+        "contains": [
+          "<class type=\"<pkg>::<Name>\" base_class_type=\"rclcpp::Node\"/>"
+        ]
+      }
+    },
+
+    "build_files": {
+      "cmake_updates": {
+        "required": [
+          "find_package(rclcpp_components REQUIRED)",
+          "add_library(<pkg> SHARED src/<Name>.cpp src/register_components.cpp)",
+          "rclcpp_components_register_nodes(<pkg> \"<pkg>::<Name>\")",
+          "install(TARGETS <pkg> ...)",
+          "install(FILES resource/<pkg>_plugin.xml DESTINATION share/<pkg>)"
+        ]
+      },
+      "package_xml_updates": {
+        "required": [
+          "<build_depend>rclcpp_components</build_depend>",
+          "<exec_depend>rclcpp_components</exec_depend>",
+          "<export>",
+          "  <rclcpp_components plugin=\"resource/<pkg>_plugin.xml\"/>",
+          "</export>"
+        ]
+      }
+    },
+
+    "pipeline_engine": {
+      "graph_loader": "Reads pipeline.yaml → converts to ComposableNode descriptions",
+      "component_loader": "Loads each node using LoadComposableNodes",
+      "container": "ComposableNodeContainer with intra-process enabled",
+      "optional_features": [
+        "distributed pipelines across multiple containers",
+        "parallel branches",
+        "conditional stages"
+      ]
+    },
+
+    "future_extensions": [
+      "Lifecycle component pipelines",
+      "Visual editor for pipelines",
+      "Pipeline debugging tools",
+      "Zero-copy shared memory optimization"
+    ]
+  }
+}

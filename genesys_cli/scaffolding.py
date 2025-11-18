@@ -56,7 +56,7 @@ def add_python_entry_point(pkg_name, node_name):
 
     # Use re.DOTALL to match newlines. Use named groups for clarity.
     match = re.search(
-        r'(?P<pre>(["\'])console_scripts\2\s*:\s*\[)(?P<scripts>.*?)(?P<post>\])',
+        r'(?P<pre>([""])console_scripts\2\s*:\s*\[)(?P<scripts>.*?)(?P<post>\])',
         content,
         re.DOTALL
     )
@@ -127,7 +127,7 @@ def add_python_component_entry_point(pkg_name, component_name):
 
     # Use re.DOTALL to match newlines. Use named groups for clarity.
     match = re.search(
-        r'(?P<pre>(["\'])rclpy_components\2\s*:\s*\[)(?P<scripts>.*?)(?P<post>\])',
+        r'(?P<pre>([""])rclpy_components\2\s*:\s*\[)(?P<scripts>.*?)(?P<post>\])',
         content,
         re.DOTALL
     )
@@ -270,8 +270,7 @@ def add_cpp_executable(pkg_name, node_name):
             lines.insert(insert_after_idx + 1, "".join(new_find_packages))
 
     # --- Build the new executable block ---
-    new_block = f'''
-add_executable({node_name} {node_src_file})
+    new_block = f'''\nadd_executable({node_name} {node_src_file})
     ament_target_dependencies({node_name}
       rclcpp
       std_msgs
@@ -423,7 +422,8 @@ def add_node_to_mixed_launch(pkg_name, node_name):
     with open(launch_file, 'r') as f:
         content = f.read()
 
-    new_node_block = f"""        Node(
+    new_node_block = f"""
+        Node(
             package='{pkg_name}',
             executable='{node_name}',
             name='{node_name}'
@@ -453,7 +453,8 @@ def add_component_to_mixed_launch(pkg_name, component_name):
     with open(launch_file, 'r') as f:
         content = f.read()
 
-    new_component_block = f"""        ComposableNode(
+    new_component_block = f"""
+        ComposableNode(
             package='{pkg_name}',
             plugin='{component_name}',
             name='{component_name}'
@@ -637,12 +638,13 @@ def add_component_to_regular_launch(pkg_name, component_name):
             nodes_in_ld = match_return.group('nodes').strip()
             
             container_ref_to_add = "container"
-            if nodes_in_ld:
-                # If there are existing nodes, add a comma before inserting the container reference
-                container_ref_to_add = ",\n        " + container_ref_to_add
-            else:
-                # If no existing nodes, just add the container reference with proper indentation
-                container_ref_to_add = "\n        " + container_ref_to_add
+            # if nodes_in_ld:
+            #     # If there are existing nodes, add a comma before inserting the container reference
+            #     container_ref_to_add = ",\n        " + container_ref_to_add
+            # else:
+            #     # If no existing nodes, just add the container reference with proper indentation
+            #     container_ref_to_add = "\n        " + container_ref_to_add
+            container_ref_to_add = "\n        " + container_ref_to_add + ",\n"
 
             # Insert the container reference into the LaunchDescription list
             content = content[:insertion_point_for_container_ref] + container_ref_to_add + content[insertion_point_for_container_ref:]
@@ -668,3 +670,115 @@ def add_component_to_regular_launch(pkg_name, component_name):
         f.write(content)
 
     click.secho(f"✓ Added '{component_name}' to regular launch file: {launch_file}", fg="green")
+
+
+def make_cpp_component(pkg_name, component_name, component_type):
+    """Creates a new C++ component and registers it in the package."""
+    
+    class_name = "".join(word.capitalize() for word in component_name.split('_'))
+    
+    # 1. Get templates
+    hpp_content, cpp_content = get_cpp_component_templates(component_type, pkg_name, class_name)
+
+    # 2. Create directories
+    pkg_path = os.path.join('src', pkg_name)
+    include_dir = os.path.join(pkg_path, 'include', pkg_name)
+    src_dir = os.path.join(pkg_path, 'src')
+    resource_dir = os.path.join(pkg_path, 'resource')
+    os.makedirs(include_dir, exist_ok=True)
+    os.makedirs(src_dir, exist_ok=True)
+    os.makedirs(resource_dir, exist_ok=True)
+
+    # 3. Create component files
+    hpp_file_path = os.path.join(include_dir, f"{class_name}.hpp")
+    cpp_file_path = os.path.join(src_dir, f"{class_name}.cpp")
+
+    with open(hpp_file_path, 'w') as f:
+        f.write(hpp_content)
+    click.secho(f"✓ Created C++ component header: {hpp_file_path}", fg="green")
+
+    with open(cpp_file_path, 'w') as f:
+        f.write(cpp_content)
+    click.secho(f"✓ Created C++ component source: {cpp_file_path}", fg="green")
+
+    # 4. Create or update register_components.cpp
+    register_components_path = os.path.join(src_dir, 'register_components.cpp')
+    new_component_registration = f'#include "{pkg_name}/{class_name}.hpp"\nRCLCPP_COMPONENTS_REGISTER_NODE({pkg_name}::{class_name})\n'
+    
+    if os.path.exists(register_components_path):
+        with open(register_components_path, 'a') as f:
+            f.write(f"\n{new_component_registration}")
+    else:
+        with open(register_components_path, 'w') as f:
+            f.write(new_component_registration)
+    click.secho(f"✓ Updated component registration file: {register_components_path}", fg="green")
+
+    # 5. Create or update plugin.xml
+    plugin_xml_path = os.path.join(resource_dir, f"{pkg_name}_plugin.xml")
+    plugin_entry = f'  <class type="{pkg_name}::{class_name}" base_class_type="rclcpp::Node">\n    <description>A C++ component of type {component_type}</description>\n  </class>'
+
+    if os.path.exists(plugin_xml_path):
+        with open(plugin_xml_path, 'r+') as f:
+            content = f.read()
+            if f'type="{pkg_name}::{class_name}"' not in content:
+                # Insert before the closing </library> tag
+                content = content.replace('</library>', f'{plugin_entry}\n</library>')
+                f.seek(0)
+                f.write(content)
+                f.truncate()
+    else:
+        plugin_content = f'<library path="{pkg_name}_components">\n{plugin_entry}\n</library>'
+        with open(plugin_xml_path, 'w') as f:
+            f.write(plugin_content)
+    click.secho(f"✓ Updated plugin XML file: {plugin_xml_path}", fg="green")
+
+    # 6. Update CMakeLists.txt
+    cmake_path = os.path.join(pkg_path, 'CMakeLists.txt')
+    with open(cmake_path, 'r') as f:
+        cmake_content = f.read()
+
+    if 'find_package(rclcpp_components REQUIRED)' not in cmake_content:
+        cmake_content = cmake_content.replace('find_package(ament_cmake REQUIRED)', 
+                                              'find_package(ament_cmake REQUIRED)\nfind_package(rclcpp_components REQUIRED)')
+
+    add_library_str = f'add_library({pkg_name}_components SHARED\n  src/register_components.cpp\n)'
+    if 'add_library' not in cmake_content:
+        cmake_content = cmake_content.replace('ament_package()', f'{add_library_str}\n\nament_package()')
+
+    register_node_str = f'rclcpp_components_register_nodes({pkg_name}_components "${{PROJECT_NAME}}::{class_name}")'
+    if 'rclcpp_components_register_nodes' not in cmake_content:
+        cmake_content = cmake_content.replace(add_library_str, f'{add_library_str}\n{register_node_str}')
+    else:
+        cmake_content = re.sub(r'(rclcpp_components_register_nodes\([^)]+)', f'\\1\n  "${{PROJECT_NAME}}::{class_name}"', cmake_content)
+
+    install_targets_str = f'install(TARGETS\n  {pkg_name}_components\n  ARCHIVE DESTINATION lib\n  LIBRARY DESTINATION lib\n  RUNTIME DESTINATION bin\n)'
+    if 'install(TARGETS' not in cmake_content:
+        cmake_content = cmake_content.replace('ament_package()', f'{install_targets_str}\n\nament_package()')
+
+    install_plugin_str = f'install(FILES\n  resource/{pkg_name}_plugin.xml\n  DESTINATION share/${{PROJECT_NAME}}\n)'
+    if 'install(FILES' not in cmake_content:
+        cmake_content = cmake_content.replace('ament_package()', f'{install_plugin_str}\n\nament_package()')
+
+    with open(cmake_path, 'w') as f:
+        f.write(cmake_content)
+    click.secho(f"✓ Updated CMakeLists.txt", fg="green")
+
+    # 7. Update package.xml
+    add_cpp_dependencies_to_package_xml(pkg_name, ["rclcpp", "rclcpp_components"])
+    package_xml_path = os.path.join(pkg_path, 'package.xml')
+    with open(package_xml_path, 'r') as f:
+        package_xml_content = f.read()
+    
+    if '<export>' not in package_xml_content:
+        package_xml_content = package_xml_content.replace('</package>', '<export></export>\n</package>')
+
+    if f'plugin="resource/{pkg_name}_plugin.xml"' not in package_xml_content:
+        export_tag = f'<export>\n    <rclcpp_components plugin="resource/{pkg_name}_plugin.xml"/>\n  </export>'
+        if '<export/>' in package_xml_content:
+            package_xml_content = package_xml_content.replace('<export/>', export_tag)
+        else:
+            package_xml_content = package_xml_content.replace('<export>', f'<export>\n    <rclcpp_components plugin="resource/{pkg_name}_plugin.xml"/>')
+
+    with open(package_xml_path, 'w') as f:
+        f.write(package_xml_content)
+    click.secho(f"✓ Updated package.xml", fg="green")

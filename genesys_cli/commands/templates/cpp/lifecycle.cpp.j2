@@ -1,95 +1,77 @@
-#include <rclcpp/rclcpp.hpp>
-#include <rclcpp_lifecycle/lifecycle_node.hpp>
-#include <rclcpp_lifecycle/lifecycle_publisher.hpp>
-#include <std_msgs/msg/string.hpp>
+#include "{{ pkg }}/{{ name }}.hpp"
 
-class {{ class_name }} : public rclcpp_lifecycle::LifecycleNode
+#include "rclcpp_components/register_node_macro.hpp"
+
+namespace {{ pkg }}
 {
-public:
-    explicit {{ class_name }}(const rclcpp::NodeOptions& options = rclcpp::NodeOptions())
-        : rclcpp_lifecycle::LifecycleNode("{{ node_name }}", options)
-    {
-    }
 
-    rclcpp_lifecycle::node_interfaces::LifecycleNodeInterface::CallbackReturn
-    on_configure(const rclcpp_lifecycle::State & state)
-    {
-        (void)state;
-        RCLCPP_INFO(get_logger(), "on_configure() is called");
-
-        // Create lifecycle publisher
-        publisher_ = create_publisher<std_msgs::msg::String>(
-            "chatter", rclcpp::QoS(10)
-        );
-
-        // Create timer
-        timer_ = create_wall_timer(
-            std::chrono::milliseconds(1000),
-            std::bind(&{{ class_name }}::on_timer, this)
-        );
-
-        return rclcpp_lifecycle::node_interfaces::LifecycleNodeInterface::CallbackReturn::SUCCESS;
-    }
-
-    rclcpp_lifecycle::node_interfaces::LifecycleNodeInterface::CallbackReturn
-    on_cleanup(const rclcpp_lifecycle::State & state)
-    {
-        (void)state;
-        RCLCPP_INFO(get_logger(), "on_cleanup() is called");
-
-        timer_.reset();
-        publisher_.reset();
-
-        return rclcpp_lifecycle::node_interfaces::LifecycleNodeInterface::CallbackReturn::SUCCESS;
-    }
-
-    rclcpp_lifecycle::node_interfaces::LifecycleNodeInterface::CallbackReturn
-    on_activate(const rclcpp_lifecycle::State & state)
-    {
-        (void)state;
-        RCLCPP_INFO(get_logger(), "on_activate() is called");
-
-        return rclcpp_lifecycle::node_interfaces::LifecycleNodeInterface::CallbackReturn::SUCCESS;
-    }
-
-    rclcpp_lifecycle::node_interfaces::LifecycleNodeInterface::CallbackReturn
-    on_deactivate(const rclcpp_lifecycle::State & state)
-    {
-        (void)state;
-        RCLCPP_INFO(get_logger(), "on_deactivate() is called");
-
-        return rclcpp_lifecycle::node_interfaces::LifecycleNodeInterface::CallbackReturn::SUCCESS;
-    }
-
-private:
-    void on_timer()
-    {
-        auto message = std_msgs::msg::String();
-        message.data = "Hello from Genesys Lifecycle Node! #" + std::to_string(count_++);
-        RCLCPP_INFO(get_logger(), "Publishing: '%s'", message.data.c_str());
-
-        if (publisher_) {
-            publisher_->publish(message);
-        }
-    }
-
-    rclcpp_lifecycle::LifecyclePublisher<std_msgs::msg::String>::SharedPtr publisher_;
-    rclcpp::TimerBase::SharedPtr timer_;
-    size_t count_ = 0;
-};
-
-int main(int argc, char * argv[])
+{{ name }}::{{ name }}(const rclcpp::NodeOptions & options)
+: rclcpp_lifecycle::LifecycleNode("{{ name | lower }}", options)
 {
-    setvbuf(stdout, NULL, _IONBF, BUFSIZ);
+}
 
-    rclcpp::init(argc, argv);
+rclcpp_lifecycle::node_interfaces::LifecycleNodeInterface::CallbackReturn
+{{ name }}::on_configure(const rclcpp_lifecycle::State & state)
+{
+    (void)state;
+    RCLCPP_INFO(get_logger(), "on_configure() is called");
 
-    rclcpp::executors::SingleThreadedExecutor exe;
-    auto node = std::make_shared<{{ class_name }}>();
+    // Create lifecycle publisher
+    publisher_ = create_publisher<std_msgs::msg::String>(
+        "chatter", rclcpp::QoS(10)
+    );
 
-    exe.add_node(node->get_node_base_interface());
-    exe.spin();
+    // Create timer
+    timer_ = create_wall_timer(
+        std::chrono::milliseconds(1000),
+        std::bind(&{{ name }}::on_timer, this)
+    );
 
-    rclcpp::shutdown();
-    return 0;
-}}
+    return rclcpp_lifecycle::node_interfaces::LifecycleNodeInterface::CallbackReturn::SUCCESS;
+}
+
+rclcpp_lifecycle::node_interfaces::LifecycleNodeInterface::CallbackReturn
+{{ name }}::on_cleanup(const rclcpp_lifecycle::State & state)
+{
+    (void)state;
+    RCLCPP_INFO(get_logger(), "on_cleanup() is called");
+
+    timer_.reset();
+    publisher_.reset();
+
+    return rclcpp_lifecycle::node_interfaces::LifecycleNodeInterface::CallbackReturn::SUCCESS;
+}
+
+rclcpp_lifecycle::node_interfaces::LifecycleNodeInterface::CallbackReturn
+{{ name }}::on_activate(const rclcpp_lifecycle::State & state)
+{
+    (void)state;
+    RCLCPP_INFO(get_logger(), "on_activate() is called");
+    publisher_->on_activate();
+    return rclcpp_lifecycle::node_interfaces::LifecycleNodeInterface::CallbackReturn::SUCCESS;
+}
+
+rclcpp_lifecycle::node_interfaces::LifecycleNodeInterface::CallbackReturn
+{{ name }}::on_deactivate(const rclcpp_lifecycle::State & state)
+{
+    (void)state;
+    RCLCPP_INFO(get_logger(), "on_deactivate() is called");
+    publisher_->on_deactivate();
+    return rclcpp_lifecycle::node_interfaces::LifecycleNodeInterface::CallbackReturn::SUCCESS;
+}
+
+void {{ name }}::on_timer()
+{
+    auto message = std_msgs::msg::String();
+    message.data = "Hello from Genesys Lifecycle Node! #" + std::to_string(count_++);
+    RCLCPP_INFO(get_logger(), "Publishing: '%s'", message.data.c_str());
+
+    if (publisher_) {
+        publisher_->publish(message);
+    }
+}
+
+} // namespace {{ pkg }}
+
+RCLCPP_COMPONENTS_REGISTER_NODE({{ pkg }}::{{ name }})
+

@@ -1,0 +1,23 @@
+#pragma once
+
+#include "rclcpp/rclcpp.hpp"
+#include "std_msgs/msg/string.hpp"
+
+namespace {{ pkg }}
+{
+
+class {{ name }} : public rclcpp::Node
+{
+public:
+    explicit {{ name }}(const rclcpp::NodeOptions & options);
+
+private:
+    void on_timer();
+
+    rclcpp::Publisher<std_msgs::msg::String>::SharedPtr publisher_;
+    rclcpp::TimerBase::SharedPtr timer_;
+    std::string message_data_;
+    size_t count_ = 0;
+};
+
+} // namespace {{ pkg }}

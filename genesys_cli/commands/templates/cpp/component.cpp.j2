@@ -1,0 +1,12 @@
+#include "{{ pkg }}/{{ name }}.hpp"
+
+namespace {{ pkg }}
+{
+
+{{ name }}::{{ name }}(const rclcpp::NodeOptions & options)
+: rclcpp::Node("{{ name | lower }}", options)
+{
+    RCLCPP_INFO(this->get_logger(), "{{ name }} component created!");
+}
+
+} // namespace {{ pkg }}

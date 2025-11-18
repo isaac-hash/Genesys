@@ -1,34 +1,28 @@
-#include <rclcpp/rclcpp.hpp>
-#include <std_msgs/msg/string.hpp>
+#include "{{ pkg }}/{{ name }}.hpp"
 
-class {{ class_name }} : public rclcpp::Node
+#include "rclcpp_components/register_node_macro.hpp"
+
+namespace {{ pkg }}
 {
-public:
-    {{ class_name }}()
-        : Node("{{ node_name }}")
-    {
-        // Create subscription
-        subscription_ = create_subscription<std_msgs::msg::String>(
-            "chatter", rclcpp::QoS(10),
-            std::bind(&{{ class_name }}::topic_callback, this, std::placeholders::_1)
-        );
 
-        RCLCPP_INFO(get_logger(), "{{ class_name }} node started");
-    }
-
-private:
-    void topic_callback(const std_msgs::msg::String & msg) const
-    {
-        RCLCPP_INFO(get_logger(), "I heard: '%s'", msg.data.c_str());
-    }
-
-    rclcpp::Subscription<std_msgs::msg::String>::SharedPtr subscription_;
-};
-
-int main(int argc, char * argv[])
+{{ name }}::{{ name }}(const rclcpp::NodeOptions & options)
+: rclcpp::Node("{{ name | lower }}", options)
 {
-    rclcpp::init(argc, argv);
-    rclcpp::spin(std::make_shared<{{ class_name }}>());
-    rclcpp::shutdown();
-    return 0;
-}}
+    // Create subscription
+    subscription_ = create_subscription<std_msgs::msg::String>(
+        "chatter", rclcpp::QoS(10),
+        std::bind(&{{ name }}::topic_callback, this, std::placeholders::_1)
+    );
+
+    RCLCPP_INFO(get_logger(), "{{ name }} component created");
+}
+
+void {{ name }}::topic_callback(const std_msgs::msg::String & msg) const
+{
+    RCLCPP_INFO(get_logger(), "I heard: '%s'", msg.data.c_str());
+}
+
+} // namespace {{ pkg }}
+
+RCLCPP_COMPONENTS_REGISTER_NODE({{ pkg }}::{{ name }})
+

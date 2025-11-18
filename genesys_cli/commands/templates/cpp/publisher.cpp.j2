@@ -1,48 +1,37 @@
-#include <rclcpp/rclcpp.hpp>
-#include <std_msgs/msg/string.hpp>
-#include <string>
+#include "{{ pkg }}/{{ name }}.hpp"
 
-class {{ class_name }} : public rclcpp::Node
+#include "rclcpp_components/register_node_macro.hpp"
+
+namespace {{ pkg }}
 {
-public:
-    {{ class_name }}()
-        : Node("{{ node_name }}")
-    {
-        // Declare parameters
-        declare_parameter("message_data", "Hello from Genesys C++! #");
-        message_data_ = get_parameter("message_data").as_string();
 
-        // Create publisher
-        publisher_ = create_publisher<std_msgs::msg::String>("chatter", rclcpp::QoS(10));
-
-        // Create timer for publishing
-        timer_ = create_wall_timer(
-            std::chrono::milliseconds(1000),
-            std::bind(&{{ class_name }}::on_timer, this)
-        );
-
-        RCLCPP_INFO(get_logger(), "{{ class_name }} node started");
-    }
-
-private:
-    void on_timer()
-    {
-        auto message = std_msgs::msg::String();
-        message.data = message_data_ + std::to_string(count_++);
-        RCLCPP_INFO(get_logger(), "Publishing: '%s'", message.data.c_str());
-        publisher_->publish(message);
-    }
-
-    rclcpp::Publisher<std_msgs::msg::String>::SharedPtr publisher_;
-    rclcpp::TimerBase::SharedPtr timer_;
-    std::string message_data_;
-    size_t count_ = 0;
-};
-
-int main(int argc, char * argv[])
+{{ name }}::{{ name }}(const rclcpp::NodeOptions & options)
+: rclcpp::Node("{{ name | lower }}", options)
 {
-    rclcpp::init(argc, argv);
-    rclcpp::spin(std::make_shared<{{ class_name }}>());
-    rclcpp::shutdown();
-    return 0;
+    // Declare parameters
+    declare_parameter("message_data", "Hello from Genesys C++! #");
+    message_data_ = get_parameter("message_data").as_string();
+
+    // Create publisher
+    publisher_ = create_publisher<std_msgs::msg::String>("chatter", rclcpp::QoS(10));
+
+    // Create timer for publishing
+    timer_ = create_wall_timer(
+        std::chrono::milliseconds(1000),
+        std::bind(&{{ name }}::on_timer, this)
+    );
+
+    RCLCPP_INFO(get_logger(), "{{ name }} component created");
 }
+
+void {{ name }}::on_timer()
+{
+    auto message = std_msgs::msg::String();
+    message.data = message_data_ + std::to_string(count_++);
+    RCLCPP_INFO(get_logger(), "Publishing: '%s'", message.data.c_str());
+    publisher_->publish(message);
+}
+
+} // namespace {{ pkg }}
+
+RCLCPP_COMPONENTS_REGISTER_NODE({{ pkg }}::{{ name }})

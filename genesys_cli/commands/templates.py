@@ -53,6 +53,25 @@ def get_cpp_node_template(node_name, class_name):
     template = env.get_template('publisher.cpp.j2')
     return template.render(node_name=node_name, class_name=class_name)
 
+
+
+def get_cpp_component_templates(component_type, pkg_name, name):
+    """Returns the boilerplate for a C++ component of a given type."""
+    env = Environment(
+        loader=FileSystemLoader(os.path.join(os.path.dirname(__file__), 'templates', 'cpp')),
+        trim_blocks=True,
+        lstrip_blocks=True
+    )
+
+    component_type_lower = component_type.lower()
+    hpp_template = env.get_template(f"{component_type_lower}.hpp.j2")
+    cpp_template = env.get_template(f"{component_type_lower}.cpp.j2")
+
+    hpp_content = hpp_template.render(pkg=pkg_name, name=name)
+    cpp_content = cpp_template.render(pkg=pkg_name, name=name)
+
+    return hpp_content, cpp_content
+
 def get_cmakelists_template(package_name):
     """Returns the boilerplate for a CMakeLists.txt file."""
     env = Environment(
