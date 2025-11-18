@@ -678,7 +678,7 @@ def make_cpp_component(pkg_name, component_name, component_type):
     class_name = "".join(word.capitalize() for word in component_name.split('_'))
     
     # 1. Get templates
-    hpp_content, cpp_content = get_cpp_component_templates(component_type, pkg_name, class_name)
+    hpp_content, cpp_content, register_content, plugin_content = get_cpp_component_templates(component_type, pkg_name, class_name, f"A C++ component of type {component_type}")
 
     # 2. Create directories
     pkg_path = os.path.join('src', pkg_name)
@@ -703,31 +703,29 @@ def make_cpp_component(pkg_name, component_name, component_type):
 
     # 4. Create or update register_components.cpp
     register_components_path = os.path.join(src_dir, 'register_components.cpp')
-    new_component_registration = f'#include "{pkg_name}/{class_name}.hpp"\nRCLCPP_COMPONENTS_REGISTER_NODE({pkg_name}::{class_name})\n'
     
     if os.path.exists(register_components_path):
         with open(register_components_path, 'a') as f:
-            f.write(f"\n{new_component_registration}")
+            f.write(f"\n{register_content}")
     else:
         with open(register_components_path, 'w') as f:
-            f.write(new_component_registration)
+            f.write(register_content)
     click.secho(f"✓ Updated component registration file: {register_components_path}", fg="green")
 
     # 5. Create or update plugin.xml
     plugin_xml_path = os.path.join(resource_dir, f"{pkg_name}_plugin.xml")
-    plugin_entry = f'  <class type="{pkg_name}::{class_name}" base_class_type="rclcpp::Node">\n    <description>A C++ component of type {component_type}</description>\n  </class>'
-
+    
     if os.path.exists(plugin_xml_path):
         with open(plugin_xml_path, 'r+') as f:
             content = f.read()
             if f'type="{pkg_name}::{class_name}"' not in content:
                 # Insert before the closing </library> tag
+                plugin_entry = f'  <class type="{pkg_name}::{class_name}" base_class_type="rclcpp::Node">\n    <description>A C++ component of type {component_type}</description>\n  </class>'
                 content = content.replace('</library>', f'{plugin_entry}\n</library>')
                 f.seek(0)
                 f.write(content)
                 f.truncate()
     else:
-        plugin_content = f'<library path="{pkg_name}_components">\n{plugin_entry}\n</library>'
         with open(plugin_xml_path, 'w') as f:
             f.write(plugin_content)
     click.secho(f"✓ Updated plugin XML file: {plugin_xml_path}", fg="green")
