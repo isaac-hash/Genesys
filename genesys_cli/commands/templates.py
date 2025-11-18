@@ -17,16 +17,19 @@ def get_python_node_template(node_type, node_name, class_name):
 
     return f"{node_content}\n{main_content}"
 
-def get_python_component_template(component_name, class_name):
-    """Returns the boilerplate for a Python component."""
+def get_python_component_template(component_type, component_name, class_name):
+    """Returns the boilerplate for a Python component of a given type."""
     env = Environment(
         loader=FileSystemLoader(os.path.join(os.path.dirname(__file__), 'templates', 'python')),
         trim_blocks=True,
         lstrip_blocks=True
     )
 
+    # Always load the generic component.py.j2 template
     template = env.get_template("component.py.j2")
-    return template.render(node_name=component_name, class_name=class_name)
+    
+    # Pass component_type as a variable to the template
+    return template.render(node_name=component_name, class_name=class_name, component_type=component_type)
 
 def get_mixed_launch_template():
     """Returns the boilerplate for a mixed launch file."""

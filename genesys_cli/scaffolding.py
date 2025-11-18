@@ -68,25 +68,32 @@ def add_python_entry_point(pkg_name, node_name):
 
     scripts_content = match.group('scripts')
 
+    # Always add a comma at the end for consistency, making it easier to append new entries.
+    new_entry = f"'{node_name} = {pkg_name}.{node_module_name}:main',"
+
     # Check if node is already registered
     if f"'{node_name} ='" in scripts_content or f'"{node_name} ="' in scripts_content:
         click.secho(f"Node '{node_name}' already exists in {setup_file}.", fg="yellow")
         return
 
 
-    # Always add a comma at the end for consistency, making it easier to append new entries.
-    new_entry = f"'{node_name} = {pkg_name}.{node_module_name}:main',"
-
-    # Determine indentation from the line before the closing bracket
-    pre_match_line_start = content.rfind('\n', 0, match.end('scripts')) + 1
-    indentation = " " * (match.start('scripts') - pre_match_line_start)
+    # Determine the base indentation of the 'entry_points' dictionary
+    entry_points_match = re.search(r'^\s*entry_points\s*=\s*\{', content, re.MULTILINE)
+    if not entry_points_match:
+        click.secho(f"Error: Could not find 'entry_points' dictionary in {setup_file}.", fg="red")
+        return
+    base_indentation = entry_points_match.start() - content.rfind('\n', 0, entry_points_match.start()) - 1
+    
+    # The indentation for items within the list should be base_indentation + 8 spaces
+    item_indentation = " " * (base_indentation + 8)
 
     # If the list is not empty, add a newline before the new entry.
     if scripts_content.strip():
-        insertion = f"\n{indentation}{new_entry}"
+        insertion = f"\n{item_indentation}{new_entry}"
     else: # The list is empty, add indentation and newlines around it.
-        indentation += "    " # Add extra indent for the first item
-        insertion = f"\n{indentation}{new_entry}\n{indentation[:-4]}"
+        # For an empty list, we want the new entry to be indented by 8 spaces,
+        # and the closing bracket to be indented by 4 spaces relative to entry_points.
+        insertion = f"\n{item_indentation}{new_entry}\n" + (" " * (base_indentation + 4))
 
     # Insert the new entry right before the closing bracket of the list.
     insertion_point = match.end('scripts')
@@ -139,16 +146,23 @@ def add_python_component_entry_point(pkg_name, component_name):
     # Always add a comma at the end for consistency, making it easier to append new entries.
     new_entry = f"'{component_name} = {pkg_name}.{component_module_name}:get_node_factory',"
 
-    # Determine indentation from the line before the closing bracket
-    pre_match_line_start = content.rfind('\n', 0, match.end('scripts')) + 1
-    indentation = " " * (match.start('scripts') - pre_match_line_start)
+    # Determine the base indentation of the 'entry_points' dictionary
+    entry_points_match = re.search(r'^\s*entry_points\s*=\s*\{', content, re.MULTILINE)
+    if not entry_points_match:
+        click.secho(f"Error: Could not find 'entry_points' dictionary in {setup_file}.", fg="red")
+        return
+    base_indentation = entry_points_match.start() - content.rfind('\n', 0, entry_points_match.start()) - 1
+    
+    # The indentation for items within the list should be base_indentation + 8 spaces
+    item_indentation = " " * (base_indentation + 8)
 
     # If the list is not empty, add a newline before the new entry.
     if scripts_content.strip():
-        insertion = f"\n{indentation}{new_entry}"
+        insertion = f"\n{item_indentation}{new_entry}"
     else: # The list is empty, add indentation and newlines around it.
-        indentation += "    " # Add extra indent for the first item
-        insertion = f"\n{indentation}{new_entry}\n{indentation[:-4]}"
+        # For an empty list, we want the new entry to be indented by 8 spaces,
+        # and the closing bracket to be indented by 4 spaces relative to entry_points.
+        insertion = f"\n{item_indentation}{new_entry}\n" + (" " * (base_indentation + 4))
 
     # Insert the new entry right before the closing bracket of the list.
     insertion_point = match.end('scripts')
@@ -352,23 +366,48 @@ def add_node_to_launch(pkg_name, node_name):
 
     # Build the new Node block (with a trailing comma, as per the original design)
     new_node_block = f'''Node(
-            package='{pkg_name}',
-            executable='{node_name}',
-            name='{node_name}',
-            output='screen',
-            emulate_tty=True
-        ),'''
+    package='{pkg_name}',
+    executable='{node_name}',
+    name='{node_name}',
+    output='screen',
+    emulate_tty=True
+)'''
 
     if f"executable='{node_name}'" in content:
         click.secho(f"Launch file already contains '{node_name}'.", fg="yellow")
         return
 
-    # Insert the new node block before the closing bracket of the LaunchDescription list.
-    updated_content = re.sub(r"(\s*)(\]\s*\))",  # Find the closing bracket and parenthesis
-        rf"\g<1>    {new_node_block}\n\g<1>\g<2>", # Indent and insert the new block
+    # Find the LaunchDescription list content
+    match = re.search(
+        r'(return LaunchDescription\(\[)(?P<nodes>.*?)(?P<post>\]\))',
         content,
-        flags=re.MULTILINE
+        re.DOTALL
     )
+
+    if not match:
+        click.secho(f"Error: Could not find 'return LaunchDescription([' in {launch_file}.", fg="red")
+        return
+
+    nodes_in_ld = match.group('nodes').strip()
+    insertion_point = match.end('nodes')
+
+    # Determine indentation
+    return_ld_start_index = content.rfind('\n', 0, match.start()) + 1
+    base_indentation = match.start() - return_ld_start_index
+    item_indentation = " " * (base_indentation + 4)
+
+    # Remove any trailing comma from the existing nodes content
+    if nodes_in_ld.endswith(','):
+        nodes_in_ld = nodes_in_ld.rstrip(',')
+
+    if nodes_in_ld:
+        # If there are existing nodes, add a comma and a newline before the new node
+        new_list_content = f"{nodes_in_ld},\n{item_indentation}{new_node_block}"
+    else:
+        # If no existing nodes, just add a newline and the new node
+        new_list_content = f"\n{item_indentation}{new_node_block}"
+
+    updated_content = content[:match.start('nodes')] + new_list_content + content[match.end('nodes'):]
 
     with open(launch_file, 'w') as f:
         f.write(updated_content)
@@ -539,11 +578,11 @@ def add_component_to_regular_launch(pkg_name, component_name):
     # Check if a ComposableNodeContainer already exists
     container_match = re.search(r'ComposableNodeContainer\(', content)
     
-    new_component_block = f"""        ComposableNode(
-            package='{pkg_name}',
-            plugin='{component_name}',
-            name='{component_name}'
-        ),
+    new_component_block = f"""ComposableNode(
+    package='{pkg_name}',
+    plugin='{component_name}',
+    name='{component_name}'
+)
 """
 
     if container_match:
@@ -554,50 +593,72 @@ def add_component_to_regular_launch(pkg_name, component_name):
             re.DOTALL
         )
         if match:
-            scripts_content = match.group('nodes')
+            scripts_content = match.group('nodes').strip() # strip to check if truly empty
             insertion_point = match.end('nodes')
             
             # Determine indentation
-            pre_match_line_start = content.rfind('\n', 0, match.end('nodes')) + 1
-            indentation = " " * (match.start('nodes') - pre_match_line_start)
+            # Find the start of the line where 'composable_node_descriptions = [' begins
+            list_start_index = content.rfind('\n', 0, match.start()) + 1
+            # Calculate the indentation of 'composable_node_descriptions = ['
+            base_indentation = match.start() - list_start_index
+            # The items in the list should be indented by base_indentation + 4 spaces
+            item_indentation = " " * (base_indentation + 4)
 
-            if scripts_content.strip():
-                insertion = f"\n{indentation}{new_component_block}"
-            else:
-                insertion = f"\n{indentation}    {new_component_block}\n{indentation}"
+            # Remove any trailing comma from the existing components content
+            if scripts_content.endswith(','):
+                scripts_content = scripts_content.rstrip(',')
 
-            content = content[:insertion_point] + insertion + content[insertion_point:]
+            if scripts_content: # If there are existing nodes
+                new_list_content = f"{scripts_content},\n{item_indentation}{new_component_block}"
+            else: # If the list is empty
+                new_list_content = f"\n{item_indentation}{new_component_block}"
+
+            content = content[:match.start('nodes')] + new_list_content + content[match.end('nodes'):]
         else:
             click.secho(f"Warning: Could not find 'composable_node_descriptions' in existing container in {launch_file}. Component not added.", fg="yellow")
             return
     else:
         # No container, add a new one and the component
-        container_block = f"""
-    container = ComposableNodeContainer(
-        name='{pkg_name}_component_container',
-        namespace='',
-        package='rclpy_components',
-        executable='component_container',
-        composable_node_descriptions=[
-{new_component_block}
-        ],
-        output='screen',
-    )
-"""
+        container_block = f"""container = ComposableNodeContainer(
+    name='{pkg_name}_component_container',
+    namespace='',
+    package='rclpy_components',
+    executable='component_container',
+    composable_node_descriptions=[
+        {new_component_block.replace('\n', '\n        ').strip()}
+    ],
+    output='screen',
+)"""
         # Find the return LaunchDescription([ and insert container before it
         match_return = re.search(r'(return LaunchDescription\(\[)(?P<nodes>.*?)(?P<post>\]\))', content, re.DOTALL)
         if match_return:
-            insertion_point = match_return.end('nodes')
+            insertion_point_for_container_ref = match_return.end('nodes')
             nodes_in_ld = match_return.group('nodes').strip()
             
+            container_ref_to_add = "container"
             if nodes_in_ld:
-                # Add comma if there are existing nodes
-                content = content[:insertion_point] + ",\n        container" + content[insertion_point:]
+                # If there are existing nodes, add a comma before inserting the container reference
+                container_ref_to_add = ",\n        " + container_ref_to_add
             else:
-                content = content[:insertion_point] + "\n        container" + content[insertion_point:]
+                # If no existing nodes, just add the container reference with proper indentation
+                container_ref_to_add = "\n        " + container_ref_to_add
+
+            # Insert the container reference into the LaunchDescription list
+            content = content[:insertion_point_for_container_ref] + container_ref_to_add + content[insertion_point_for_container_ref:]
             
             # Insert the container block itself before the return statement
-            content = content[:match_return.start()] + container_block + content[match_return.start():]
+            # Find the line before 'return LaunchDescription'
+            return_ld_start = content.find('return LaunchDescription')
+            if return_ld_start != -1:
+                # Find the start of the line containing 'return LaunchDescription'
+                line_start = content.rfind('\n', 0, return_ld_start) + 1
+                # Get the indentation of the 'return LaunchDescription' line
+                return_indentation = content[line_start:return_ld_start]
+                # Insert the container block at the start of that line with the same indentation
+                content = content[:line_start] + return_indentation + container_block + "\n\n" + content[line_start:]
+            else:
+                click.secho(f"Warning: Could not find 'return LaunchDescription' to insert container block in {launch_file}. Component container not added.", fg="yellow")
+                return
         else:
             click.secho(f"Warning: Could not find 'return LaunchDescription' in {launch_file}. Component container not added.", fg="yellow")
             return

@@ -20,6 +20,28 @@ from genesys_cli.scaffolding import (
 )
 from .templates import get_python_node_template, get_python_component_template, get_mixed_launch_template, get_cpp_node_template, get_cmakelists_template
 
+def _get_choice_from_numbered_list(prompt_message, choices, default_index=0):
+    """
+    Presents a numbered list of choices to the user and returns the selected choice.
+    """
+    click.echo(prompt_message)
+    for i, choice in enumerate(choices):
+        click.echo(f"  {i+1}. {choice}")
+    
+    while True:
+        try:
+            response = click.prompt(
+                f"Enter your choice (1-{len(choices)})",
+                type=click.IntRange(1, len(choices)),
+                default=default_index + 1 # Adjust default to be 1-indexed
+            )
+            return choices[response - 1] # Convert back to 0-indexed
+        except click.exceptions.Abort:
+            click.secho("Aborted.", fg="red")
+            sys.exit(1)
+        except Exception as e:
+            click.secho(f"Invalid input: {e}. Please try again.", fg="red")
+
 @click.group("make")
 def make():
     """Scaffold ROS 2 components."""
@@ -99,10 +121,11 @@ def make_node(ctx, node_name, pkg_name, is_component):
         ctx.invoke(make_component, component_name=node_name, pkg_name=pkg_name)
         return
 
-    node_type = click.prompt(
-        'Select node type',
-        type=click.Choice(['Publisher', 'Subscriber', 'Service', 'ActionServer', 'Lifecycle'], case_sensitive=False),
-        default='Publisher'
+    node_choices = ['Publisher', 'Subscriber', 'Service', 'ActionServer', 'Lifecycle']
+    node_type = _get_choice_from_numbered_list(
+        'Select node type:',
+        node_choices,
+        default_index=node_choices.index('Publisher')
     )
     click.echo(f"Scaffolding a '{node_type}' node named '{node_name}' in package '{pkg_name}'.")
 
@@ -163,7 +186,13 @@ def make_node(ctx, node_name, pkg_name, is_component):
 @click.pass_context
 def make_component(ctx, component_name, pkg_name):
     """Creates a new component file and registers it in an existing package."""
-    click.echo(f"Scaffolding a component named '{component_name}' in package '{pkg_name}'.")
+    component_choices = ['Publisher', 'Subscriber', 'Service', 'ActionServer', 'Lifecycle']
+    component_type = _get_choice_from_numbered_list(
+        'Select component type:',
+        component_choices,
+        default_index=component_choices.index('Publisher')
+    )
+    click.echo(f"Scaffolding a '{component_type}' component named '{component_name}' in package '{pkg_name}'.")
 
     pkg_path = os.path.join('src', pkg_name)
     if not os.path.isdir(pkg_path):
@@ -179,7 +208,8 @@ def make_component(ctx, component_name, pkg_name):
         os.makedirs(comp_dir, exist_ok=True)
         comp_file = os.path.join(comp_dir, f"{component_name}.py")
         with open(comp_file, 'w') as f:
-            py_boilerplate = get_python_component_template(component_name, class_name)
+            # Pass component_type to the template function
+            py_boilerplate = get_python_component_template(component_type.lower(), component_name, class_name)
             f.write(py_boilerplate)
         click.secho(f"✓ Created Python component file: {comp_file}", fg="green")
         add_python_component_entry_point(pkg_name, component_name)
