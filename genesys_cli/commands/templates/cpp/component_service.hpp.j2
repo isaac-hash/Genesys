@@ -9,7 +9,7 @@ namespace {{ package_name }}
 class {{ class_name }} : public rclcpp::Node
 {
 public:
-    {{ class_name }}();
+    explicit {{ class_name }}(const rclcpp::NodeOptions & options);
 
 private:
     rclcpp::Service<example_interfaces::srv::AddTwoInts>::SharedPtr service_;

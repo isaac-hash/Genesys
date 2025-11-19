@@ -18,6 +18,7 @@ from genesys_cli.scaffolding import (
     add_default_launch_file,
     add_component_to_regular_launch,
     make_cpp_component,
+    make_cpp_node,
 )
 from .templates import get_python_node_template, get_python_component_template, get_mixed_launch_template, get_cpp_node_template, get_cmakelists_template, get_cpp_component_templates
 
@@ -150,23 +151,7 @@ def make_node(ctx, node_name, pkg_name, is_component):
         add_python_entry_point(pkg_name, node_name)
         add_node_to_mixed_launch(pkg_name, node_name)
     elif os.path.exists(os.path.join(pkg_path, 'CMakeLists.txt')): # C++ package
-        # C++ package
-        node_dir = os.path.join(pkg_path, 'src')
-        os.makedirs(node_dir, exist_ok=True)
-        node_file = os.path.join(node_dir, f"{node_name}.cpp")
-        if node_type.lower() != 'publisher': # Based on original logic
-            click.secho(
-                "Warning: C++ node scaffolding currently only supports the 'Publisher' type. "
-                "A publisher node will be created.",
-                fg="yellow"
-            )
-        
-        cpp_boilerplate = get_cpp_node_template(pkg_name, node_name, class_name)
-        with open(node_file, 'w') as f:
-            f.write(cpp_boilerplate)
-        click.secho(f"✓ Created C++ node file: {node_file}", fg="green")
-        add_cpp_executable(pkg_name, node_name)
-        add_cpp_dependencies_to_package_xml(pkg_name, ["rclcpp", "std_msgs"])
+        make_cpp_node(pkg_name, node_name, node_type)
     else:
         click.secho(f"Error: Could not determine package type for '{pkg_name}'. No setup.py or CMakeLists.txt found.", fg="red")
         sys.exit(1)

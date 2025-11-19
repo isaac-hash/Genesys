@@ -1,10 +1,12 @@
 #include "{{ package_name }}/{{ class_name }}.hpp"
 
+#include "rclcpp_components/register_node_macro.hpp"
+
 namespace {{ package_name }}
 {
 
-{{ class_name }}::{{ class_name }}()
-: rclcpp::Node("{{ class_name | lower }}")
+{{ class_name }}::{{ class_name }}(const rclcpp::NodeOptions & options)
+: rclcpp::Node("{{ class_name | lower }}", options)
 {
     // Declare parameters
     declare_parameter("message_data", "Hello from Genesys C++! #");
@@ -19,7 +21,7 @@ namespace {{ package_name }}
         std::bind(&{{ class_name }}::on_timer, this)
     );
 
-    RCLCPP_INFO(get_logger(), "{{ class_name }} node created");
+    RCLCPP_INFO(get_logger(), "{{ class_name }} component created");
 }
 
 void {{ class_name }}::on_timer()
@@ -32,10 +34,4 @@ void {{ class_name }}::on_timer()
 
 } // namespace {{ package_name }}
 
-int main(int argc, char * argv[])
-{
-    rclcpp::init(argc, argv);
-    rclcpp::spin(std::make_shared<{{ package_name }}::{{ class_name }}>());
-    rclcpp::shutdown();
-    return 0;
-}
+RCLCPP_COMPONENTS_REGISTER_NODE({{ package_name }}::{{ class_name }})

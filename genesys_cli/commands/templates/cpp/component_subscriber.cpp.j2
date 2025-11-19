@@ -1,10 +1,12 @@
 #include "{{ package_name }}/{{ class_name }}.hpp"
 
+#include "rclcpp_components/register_node_macro.hpp"
+
 namespace {{ package_name }}
 {
 
-{{ class_name }}::{{ class_name }}()
-: rclcpp::Node("{{ class_name | lower }}")
+{{ class_name }}::{{ class_name }}(const rclcpp::NodeOptions & options)
+: rclcpp::Node("{{ class_name | lower }}", options)
 {
     // Create subscription
     subscription_ = create_subscription<std_msgs::msg::String>(
@@ -12,20 +14,14 @@ namespace {{ package_name }}
         std::bind(&{{ class_name }}::topic_callback, this, std::placeholders::_1)
     );
 
-    RCLCPP_INFO(get_logger(), "{{ class_name }} node created");
+    RCLCPP_INFO(get_logger(), "{{ class_name }} component created");
 }
 
 void {{ class_name }}::topic_callback(const std_msgs::msg::String & msg) const
 {
-    RCLCPP_INFO(get_logger(), "I heard: '%s'", msg->data.c_str());
+    RCLCPP_INFO(get_logger(), "I heard: '%s'", msg.data.c_str());
 }
 
 } // namespace {{ package_name }}
 
-int main(int argc, char * argv[])
-{
-    rclcpp::init(argc, argv);
-    rclcpp::spin(std::make_shared<{{ package_name }}::{{ class_name }}>());
-    rclcpp::shutdown();
-    return 0;
-}
+RCLCPP_COMPONENTS_REGISTER_NODE({{ package_name }}::{{ class_name }})
