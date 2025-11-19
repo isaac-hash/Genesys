@@ -84,8 +84,10 @@ def get_cpp_component_templates(component_type, pkg_name, class_name, descriptio
     """Renders all necessary C++ component templates."""
     env = get_template_env() # This will look in the root of templates dir
 
-    hpp_template = env.get_template(f'cpp/component_{component_type}.hpp.j2')
-    cpp_template = env.get_template(f'cpp/component_{component_type}.cpp.j2')
+    key = component_type.lower()
+    hpp_template = env.get_template(f'cpp/component_{key}.hpp.j2')
+
+    cpp_template = env.get_template(f'cpp/component_{key}.cpp.j2')
     register_template = env.get_template('cpp/register_components.cpp.j2')
     plugin_template = env.get_template('cpp/plugin.xml.j2')
 
@@ -95,6 +97,8 @@ def get_cpp_component_templates(component_type, pkg_name, class_name, descriptio
     plugin_content = plugin_template.render(package_name=pkg_name, class_name=class_name, description=description)
     
     return hpp_content, cpp_content, register_content, plugin_content
+
+
 
 def get_cpp_component_cmakelists_template(context):
     """Returns the boilerplate for a C++ component CMakeLists.txt file."""
