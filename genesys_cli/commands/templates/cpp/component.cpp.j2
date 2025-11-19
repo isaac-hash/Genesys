@@ -1,12 +1,31 @@
-#include "{{ pkg }}/{{ name }}.hpp"
+#include "{{ package_name }}/{{ class_name }}.hpp"
+#include "rclcpp_components/register_node_macro.hpp"
 
-namespace {{ pkg }}
+#include <chrono>
+#include <iostream>
+#include <memory>
+#include <string>
+
+using namespace std::chrono_literals;
+
+namespace {{ package_name }}
 {
 
-{{ name }}::{{ name }}(const rclcpp::NodeOptions & options)
-: rclcpp::Node("{{ name | lower }}", options)
+{{ class_name }}::{{ class_name }}(const rclcpp::NodeOptions & options)
+: Node("{{ component_name }}", options)
 {
-    RCLCPP_INFO(this->get_logger(), "{{ name }} component created!");
+  publisher_ = this->create_publisher<std_msgs::msg::String>("topic", 10);
+  timer_ = this->create_wall_timer(
+    500ms, std::bind(&{{ class_name }}::timer_callback, this));
+  RCLCPP_INFO(this->get_logger(), "Hello, world! This is a {{ component_type }} component.");
 }
 
-} // namespace {{ pkg }}
+void {{ class_name }}::timer_callback()
+{
+  auto message = std_msgs::msg::String();
+  message.data = "Hello, world! From {{ component_name }} with type {{ component_type }}! " + std::to_string(this->now().seconds());
+  RCLCPP_INFO(this->get_logger(), "Publishing: '%s'", message.data.c_str());
+  publisher_->publish(message);
+}
+
+}  // namespace {{ package_name }}
