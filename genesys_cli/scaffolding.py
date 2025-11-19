@@ -701,15 +701,16 @@ def add_component_to_regular_launch(pkg_name, component_name):
 
 
 def make_cpp_component(pkg_name, component_name, component_type):
-    """Creates a new C++ component and registers it in the package."""
+    """Creates a new C++ component and correctly registers it in the package."""
     
     class_name = "".join(word.capitalize() for word in component_name.split('_'))
     pkg_path = os.path.join('src', pkg_name)
+    
+    # --- 1. Get templates ---
+    from genesys_cli.commands.templates import get_cpp_component_templates, get_cpp_component_cmakelists_template
+    hpp_content, cpp_content, _, plugin_content = get_cpp_component_templates(component_type, pkg_name, class_name, f"A C++ component of type {component_type}")
 
-    # 1. Get templates
-    hpp_content, cpp_content, register_content, plugin_content = get_cpp_component_templates(component_type, pkg_name, class_name, f"A C++ component of type {component_type}")
-
-    # 2. Create directories and .hpp/.cpp files
+    # --- 2. Create directories and .hpp/.cpp files ---
     include_dir = os.path.join(pkg_path, 'include', pkg_name)
     src_dir = os.path.join(pkg_path, 'src')
     resource_dir = os.path.join(pkg_path, 'resource')
@@ -725,27 +726,23 @@ def make_cpp_component(pkg_name, component_name, component_type):
     with open(cpp_file_path, 'w') as f: f.write(cpp_content)
     click.secho(f"✓ Created C++ component source: {cpp_file_path}", fg="green")
 
-    # 3. Create or update register_components.cpp
+    # --- 3. Create or update register_components.cpp ---
     register_components_path = os.path.join(src_dir, "register_components.cpp")
     include_line = f'#include "{pkg_name}/{class_name}.hpp"'
     register_macro_line = f'RCLCPP_COMPONENTS_REGISTER_NODE({pkg_name}::{class_name})'
-
     if not os.path.exists(register_components_path):
-        # Create the file with the first component's info
-        initial_register_content = f"{include_line}\n\n{register_macro_line}\n"
         with open(register_components_path, "w") as f:
-            f.write(initial_register_content)
+            f.write(f"{include_line}\n{register_macro_line}\n")
         click.secho(f"✓ Created component registration file: {register_components_path}", fg="green")
     else:
-        # Append info for the new component if it's not already there
         with open(register_components_path, "r+") as f:
             content = f.read()
             if class_name not in content:
-                f.write(f"\n{include_line}")
-                f.write(f"\n{register_macro_line}\n")
+                f.seek(0, 2) # Go to end of file
+                f.write(f"\n{include_line}\n{register_macro_line}\n")
                 click.secho(f"✓ Updated component registration file for {class_name}", fg="green")
 
-    # 4. Update CMakeLists.txt carefully
+    # --- 4. Update CMakeLists.txt carefully ---
     cmake_path = os.path.join(pkg_path, "CMakeLists.txt")
     if not os.path.exists(cmake_path):
         click.secho(f"Error: {cmake_path} not found.", fg="red")
@@ -761,6 +758,7 @@ def make_cpp_component(pkg_name, component_name, component_type):
     if component_src_file not in content:
         add_library_match = re.search(fr"add_library\(\s*{component_lib_name}\s+SHARED", content)
         if add_library_match:
+            # --- Logic for subsequent components ---
             for i, line in enumerate(lines):
                 if add_library_match.group(0) in line:
                     j = i
@@ -768,36 +766,37 @@ def make_cpp_component(pkg_name, component_name, component_type):
                     lines.insert(j, f"  {component_src_file}\n")
                     click.secho(f"✓ Added '{class_name}.cpp' to component library in CMakeLists.txt", fg="green")
                     break
+            # Also add to the registration macro
+            register_nodes_match = re.search(fr"rclcpp_components_register_nodes\(\s*{component_lib_name}", content)
+            for i, line in enumerate(lines):
+                if register_nodes_match and register_nodes_match.group(0) in line:
+                    j = i
+                    while ')' not in lines[j]: j += 1
+                    lines.insert(j, f'  "{pkg_name}::{class_name}"\n')
+                    click.secho(f"✓ Registered '{class_name}' plugin in CMakeLists.txt", fg="green")
+                    break
         else:
+            # --- Logic for the first component ---
             ament_line_idx = next((i for i, line in enumerate(lines) if "ament_package()" in line), -1)
             if ament_line_idx != -1:
-                component_block = f"""
-add_library({component_lib_name} SHARED
-  src/register_components.cpp
-  {component_src_file}
-)
+                # Get all existing components to create a complete template
+                all_components = [{'class_name': class_name}] # Start with the new one
+                # Note: This logic assumes if the library doesn't exist, this is the only component.
+                # A more robust implementation might scan the directory for other component files.
+                
+                context = {"package_name": pkg_name, "components": all_components}
+                component_block = get_cpp_component_cmakelists_template(context)
+                lines.insert(ament_line_idx, component_block + "\n")
+                click.secho(f"✓ Added new component build configuration to CMakeLists.txt", fg="green")
 
-ament_target_dependencies({component_lib_name}
-  rclcpp
-  rclcpp_components
-)
-
-install(
-  TARGETS {component_lib_name}
-  DESTINATION lib
-)
-"""
-                lines.insert(ament_line_idx, component_block)
-                click.secho(f"✓ Added new component library to CMakeLists.txt", fg="green")
-        
         with open(cmake_path, 'w') as f:
             f.write("".join(lines))
 
-    # 5. Create or update plugin.xml
+    # --- 5. Create or update plugin.xml ---
     plugin_xml_path = os.path.join(resource_dir, f"{pkg_name}_plugin.xml")
     plugin_entry_snippet = (
         f'  <class type="{pkg_name}::{class_name}" base_class_type="rclcpp::Node">\n'
-        f'    <description>A C++ component of type {component_type}</description>\n'
+        f'    <description>A C++ component of type {component_type}.</description>\n'
         '  </class>'
     )
     if os.path.exists(plugin_xml_path):
@@ -808,19 +807,21 @@ install(
                 f.seek(0); f.write(updated_content); f.truncate()
                 click.secho(f"✓ Added component entry to plugin XML: {plugin_xml_path}", fg="green")
     else:
+        # Use the base template and insert the first entry
+        base_plugin_xml = plugin_content.replace("</library>", f"{plugin_entry_snippet}\n</library>")
         with open(plugin_xml_path, "w") as f:
-            f.write(plugin_content.replace("</library>", f"{plugin_entry_snippet}\n</library>"))
+            f.write(base_plugin_xml)
         click.secho(f"✓ Created plugin XML file: {plugin_xml_path}", fg="green")
 
-    # 6. Update package.xml
-    add_cpp_dependencies_to_package_xml(pkg_name, ["rclcpp", "rclcpp_components"])
+    # --- 6. Update package.xml for component support ---
+    add_cpp_dependencies_to_package_xml(pkg_name, ["rclcpp", "rclcpp_components", "pluginlib"])
     package_xml_path = os.path.join(pkg_path, "package.xml")
     with open(package_xml_path, "r+") as f:
         content = f.read()
         if "<export>" not in content:
-            content = content.replace("</package>", "<export></export>\n</package>")
+            content = content.replace("</package>", "\n<export>\n</export>\n</package>")
         if f'plugin="resource/{pkg_name}_plugin.xml"' not in content:
-            content = content.replace("<export>", f'<export>\n    <rclcpp_components plugin="resource/{pkg_name}_plugin.xml"/>')
+            content = content.replace("</export>", f'  <rclcpp_components plugin="resource/{pkg_name}_plugin.xml"/>\n</export>')
         f.seek(0); f.write(content); f.truncate()
     click.secho(f"✓ Updated package.xml for components", fg="green")
 
