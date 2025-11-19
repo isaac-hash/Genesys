@@ -290,12 +290,19 @@ def add_cpp_executable(pkg_name, node_name):
             lines.insert(insert_after_idx + 1, "".join(new_find_packages))
 
     # --- Build the new executable block ---
-    new_block = f'''\nadd_executable({node_name} {node_src_file})
-    ament_target_dependencies({node_name}
-      rclcpp
-      std_msgs
-      rclcpp_lifecycle
-    )
+    new_block = f'''
+add_executable({node_name} {node_src_file})
+
+target_include_directories({node_name} PUBLIC
+  $<BUILD_INTERFACE:${{CMAKE_CURRENT_SOURCE_DIR}}/include>
+  $<INSTALL_INTERFACE:include/${{PROJECT_NAME}}>
+)
+
+ament_target_dependencies({node_name}
+  rclcpp
+  std_msgs
+  rclcpp_lifecycle
+)
 
 install(TARGETS
   {node_name}
@@ -310,6 +317,7 @@ install(TARGETS
         f.write(''.join(lines))
 
     click.secho(f"Registered '{node_name}' in {cmake_file}", fg="green")
+
 
 def add_install_rule_for_launch_dir_cpp(pkg_name):
     """Adds the install rule for the launch directory to CMakeLists.txt."""
