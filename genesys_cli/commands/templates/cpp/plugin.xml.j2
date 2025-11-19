@@ -1,5 +1,7 @@
-<library path="{{ pkg }}">
-  <class type="{{ pkg }}::{{ name }}" base_class_type="rclcpp::Node">
+<library path="{{ pkg }}_components">
+  <class
+      type="{{ pkg }}::{{ name }}"
+      base_class_type="rclcpp_components::NodeFactory">
     <description>
       {{ description }}
     </description>
