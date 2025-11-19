@@ -260,6 +260,7 @@ def make_component(ctx, component_name, pkg_name):
 
     click.echo("\nRun 'genesys build' to make the new component available.")
 
+
 @make.command("launch")
 @click.option('--pkg', 'pkg_name', required=True, help='The name of the package to add the launch file to.')
 @click.option('--name', 'launch_name', default='mixed_launch', help='The name of the launch file.')

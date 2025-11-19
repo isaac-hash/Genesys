@@ -55,12 +55,30 @@ def add_python_entry_point(pkg_name, node_name):
     with open(setup_file, 'r') as f:
         content = f.read()
 
+    # If 'console_scripts' doesn't exist, add it inside 'entry_points'.
+    if "'console_scripts'" not in content and '"console_scripts"' not in content:
+        entry_points_match = re.search(r'entry_points\s*=\s*\{', content)
+        if not entry_points_match:
+            click.secho(f"Error: Could not find 'entry_points' in {setup_file}.", fg="red")
+            return
+
+        # Determine indentation from the 'entry_points' line
+        line_start = content.rfind('\n', 0, entry_points_match.start()) + 1
+        indentation = " " * (entry_points_match.start() - line_start)
+
+        insertion_point = entry_points_match.end()
+        # Insert the new 'console_scripts' list.
+        new_entry_point = f"\n{indentation}    'console_scripts': [],"
+        content = content[:insertion_point] + new_entry_point + content[insertion_point:]
+
+
     # Use re.DOTALL to match newlines. Use named groups for clarity.
     match = re.search(
-        r'(?P<pre>([""])console_scripts\2\s*:\s*\[)(?P<scripts>.*?)(?P<post>\])',
+        r"(?P<pre>'console_scripts'\s*:\s*\[|\"console_scripts\"\s*:\s*\[)(?P<scripts>.*?)(?P<post>\])",
         content,
         re.DOTALL
     )
+
 
 
     if not match:
@@ -105,6 +123,7 @@ def add_python_entry_point(pkg_name, node_name):
     
     click.secho(f"✓ Registered '{node_name}' in {setup_file}", fg="green")
 
+
 def add_python_component_entry_point(pkg_name, component_name):
     """Adds a new rclpy_components entry to a package's setup.py file."""
     setup_file = os.path.join('src', pkg_name, 'setup.py')
@@ -128,7 +147,7 @@ def add_python_component_entry_point(pkg_name, component_name):
 
     # Use re.DOTALL to match newlines. Use named groups for clarity.
     match = re.search(
-        r'(?P<pre>([""])rclpy_components\2\s*:\s*\[)(?P<scripts>.*?)(?P<post>\])',
+        r"(?P<pre>(['\"])rclpy_components\1\s*:\s*\[)(?P<scripts>.*?)(?P<post>\])",
         content,
         re.DOTALL
     )
@@ -301,8 +320,9 @@ def add_install_rule_for_launch_dir_cpp(pkg_name):
     with open(cmake_file, 'r') as f:
         lines = f.readlines()
 
-    # Check if the rule already exists
-    if any('install(DIRECTORY launch' in line for line in lines):
+    # Check if the rule already exists using a more robust regex
+    content = "".join(lines)
+    if re.search(r"install\s*\(\s*DIRECTORY\s+launch", content):
         return
 
     # Find the ament_package() call to insert before it
@@ -777,13 +797,31 @@ def make_cpp_component(pkg_name, component_name, component_type):
     cmake_path = os.path.join(pkg_path, "CMakeLists.txt")
     from genesys_cli.commands.templates import get_cpp_component_cmakelists_template
 
+    executable_blocks = []
+    find_package_calls = []
+    if os.path.exists(cmake_path):
+        with open(cmake_path, "r") as f:
+            content = f.read()
+            # Find and store existing add_executable blocks to preserve them
+            executable_matches = re.finditer(
+                r"(^\s*add_executable\([\s\S]*?\)(?:(?!^\s*(?:add_executable|add_library|ament_package))[\s\S])*)",
+                content,
+                re.DOTALL | re.MULTILINE
+            )
+            for match in executable_matches:
+                executable_blocks.append(match.group(1))
+            
+            # Find and store existing find_package calls
+            find_package_matches = re.finditer(r"(find_package\([^\)]+\)\n?)", content)
+            for match in find_package_matches:
+                find_package_calls.append(match.group(1))
+
     # Check existing components to avoid duplicates and build a list
     existing_components = []
     if os.path.exists(cmake_path):
         with open(cmake_path, "r") as f:
             content = f.read()
             # Find existing components by looking at the source files listed in add_library
-            # This regex needs to be robust to handle multiple lines and different formatting
             add_library_match = re.search(
                 r"add_library\(\s*(\w+)_components\s*SHARED\s*(.*?)\)",
                 content,
@@ -805,6 +843,38 @@ def make_cpp_component(pkg_name, component_name, component_type):
     # Render the new CMakeLists.txt from the component template
     context = {"package_name": pkg_name, "components": existing_components}
     cmakelists_content = get_cpp_component_cmakelists_template(context)
+
+    # --- Start: Inject preserved parts ---
+
+    # 1. Inject find_package calls if they are not already there
+    ament_cmake_found_match = re.search(r"find_package\(ament_cmake REQUIRED\)\n", cmakelists_content)
+    if ament_cmake_found_match:
+        insertion_point = ament_cmake_found_match.end()
+        
+        # Create a set of packages already found in the new template
+        existing_packages_in_template = set(re.findall(r"find_package\(([^ \)]+)", cmakelists_content))
+
+        new_find_packages_str = ""
+        for call in find_package_calls:
+            package_name_match = re.search(r"find_package\(([^ \)]+)", call)
+            if package_name_match:
+                package_name = package_name_match.group(1)
+                if package_name not in existing_packages_in_template:
+                     new_find_packages_str += call
+
+        if new_find_packages_str:
+            cmakelists_content = cmakelists_content[:insertion_point] + new_find_packages_str + cmakelists_content[insertion_point:]
+
+    # 2. Inject executable blocks before ament_package()
+    if executable_blocks:
+        ament_package_match = re.search(r"ament_package\(\)", cmakelists_content)
+        if ament_package_match:
+            insertion_point = ament_package_match.start()
+            all_exec_blocks = "".join(executable_blocks)
+            cmakelists_content = cmakelists_content[:insertion_point] + all_exec_blocks + "\n" + cmakelists_content[insertion_point:]
+    
+    # --- End: Inject preserved parts ---
+
     with open(cmake_path, "w") as f:
         f.write(cmakelists_content)
     click.secho(f"✓ Updated CMakeLists.txt", fg="green")
