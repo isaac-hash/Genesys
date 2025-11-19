@@ -161,7 +161,7 @@ def make_node(ctx, node_name, pkg_name, is_component):
                 fg="yellow"
             )
         
-        cpp_boilerplate = get_cpp_node_template(node_name, class_name)
+        cpp_boilerplate = get_cpp_node_template(pkg_name, node_name, class_name)
         with open(node_file, 'w') as f:
             f.write(cpp_boilerplate)
         click.secho(f"✓ Created C++ node file: {node_file}", fg="green")
@@ -259,6 +259,7 @@ def make_component(ctx, component_name, pkg_name):
         sys.exit(1)
 
     click.echo("\nRun 'genesys build' to make the new component available.")
+
 
 @make.command("launch")
 @click.option('--pkg', 'pkg_name', required=True, help='The name of the package to add the launch file to.')

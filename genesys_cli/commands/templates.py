@@ -59,12 +59,12 @@ def get_mixed_launch_template():
     template = env.get_template("mixed_launch.py.j2")
     return template.render()
 
-def get_cpp_node_template(node_name, class_name):
+def get_cpp_node_template(pkg_name, node_name, class_name):
     """Returns the boilerplate for a C++ node."""
     env = get_template_env('cpp')
 
     template = env.get_template('publisher.cpp.j2')
-    return template.render(node_name=node_name, class_name=class_name)
+    return template.render(package_name=pkg_name, node_name=node_name, class_name=class_name)
 
 def get_cmakelists_template(package_name):
     """Returns the boilerplate for a CMakeLists.txt file."""
@@ -77,21 +77,17 @@ def get_cpp_component_templates(component_type, pkg_name, class_name, descriptio
     """Renders all necessary C++ component templates."""
     env = get_template_env() # This will look in the root of templates dir
 
-    hpp_template = env.get_template(f'cpp/{component_type}.hpp.j2')
-    cpp_template = env.get_template(f'cpp/{component_type}.cpp.j2')
+    # Convert component type to lowercase for template file names
+    component_type_lower = component_type.lower()
+    hpp_template = env.get_template(f'cpp/{component_type_lower}.hpp.j2')
+    cpp_template = env.get_template(f'cpp/{component_type_lower}.cpp.j2')
     register_template = env.get_template('cpp/register_components.cpp.j2')
     plugin_template = env.get_template('cpp/plugin.xml.j2')
 
-    context = {
-        "package_name": pkg_name,
-        "class_name": class_name,
-        "description": description
-    }
-
-    hpp_content = hpp_template.render(**context)
-    cpp_content = cpp_template.render(**context)
-    register_content = register_template.render(**context)
-    plugin_content = plugin_template.render(**context)
+    hpp_content = hpp_template.render(package_name=pkg_name, class_name=class_name, description=description)
+    cpp_content = cpp_template.render(package_name=pkg_name, class_name=class_name, description=description)
+    register_content = register_template.render(package_name=pkg_name, class_name=class_name)
+    plugin_content = plugin_template.render(package_name=pkg_name, class_name=class_name, description=description)
     
     return hpp_content, cpp_content, register_content, plugin_content
 

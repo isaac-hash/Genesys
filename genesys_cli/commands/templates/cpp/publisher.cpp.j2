@@ -1,12 +1,12 @@
-#include "{{ pkg }}/{{ name }}.hpp"
+#include "{{ package_name }}/{{ class_name }}.hpp"
 
 #include "rclcpp_components/register_node_macro.hpp"
 
-namespace {{ pkg }}
+namespace {{ package_name }}
 {
 
-{{ name }}::{{ name }}(const rclcpp::NodeOptions & options)
-: rclcpp::Node("{{ name | lower }}", options)
+{{ class_name }}::{{ class_name }}(const rclcpp::NodeOptions & options)
+: rclcpp::Node("{{ node_name }}", options)
 {
     // Declare parameters
     declare_parameter("message_data", "Hello from Genesys C++! #");
@@ -18,13 +18,13 @@ namespace {{ pkg }}
     // Create timer for publishing
     timer_ = create_wall_timer(
         std::chrono::milliseconds(1000),
-        std::bind(&{{ name }}::on_timer, this)
+        std::bind(&{{ class_name }}::on_timer, this)
     );
 
-    RCLCPP_INFO(get_logger(), "{{ name }} component created");
+    RCLCPP_INFO(get_logger(), "{{ class_name }} component created");
 }
 
-void {{ name }}::on_timer()
+void {{ class_name }}::on_timer()
 {
     auto message = std_msgs::msg::String();
     message.data = message_data_ + std::to_string(count_++);
@@ -32,6 +32,6 @@ void {{ name }}::on_timer()
     publisher_->publish(message);
 }
 
-} // namespace {{ pkg }}
+} // namespace {{ package_name }}
 
-RCLCPP_COMPONENTS_REGISTER_NODE({{ pkg }}::{{ name }})
+RCLCPP_COMPONENTS_REGISTER_NODE({{ package_name }}::{{ class_name }})
