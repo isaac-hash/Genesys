@@ -20,7 +20,7 @@ add_library({{ package_name }}_components SHARED
 )
 
 target_include_directories({{ package_name }}_components PUBLIC
-  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}}/include>
+  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
   $<INSTALL_INTERFACE:include>
 )
 
@@ -30,9 +30,10 @@ ament_target_dependencies({{ package_name }}_components
   std_msgs
 )
 
-rclcpp_components_register_nodes({{ package_name }}_components
+rclcpp_components_register_nodes(
+  {{ package_name }}_components
 {%- for component in components %}
-  "${{PROJECT_NAME}}::{{ component.class_name }}"
+  "{{ package_name }}::{{ component.class_name }}"
 {%- endfor %}
 )
 
@@ -41,10 +42,25 @@ install(TARGETS
   {{ package_name }}_components
   ARCHIVE DESTINATION lib
   LIBRARY DESTINATION lib
-  RUNTIME DESTINATION bin)
+  RUNTIME DESTINATION bin
+)
 
 install(FILES
   resource/{{ package_name }}_plugin.xml
-  DESTINATION share/${{PROJECT_NAME}})
+  DESTINATION share/${PROJECT_NAME}
+)
+
+install(
+  DIRECTORY launch
+  DESTINATION share/${PROJECT_NAME}
+)
+
+# Optional testing/linting
+if(BUILD_TESTING)
+  find_package(ament_lint_auto REQUIRED)
+  set(ament_cmake_copyright_FOUND TRUE)
+  set(ament_cmake_cpplint_FOUND TRUE)
+  ament_lint_auto_find_test_dependencies()
+endif()
 
 ament_package()

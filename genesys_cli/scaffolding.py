@@ -454,27 +454,30 @@ def add_component_to_mixed_launch(pkg_name, component_name):
     with open(launch_file, 'r') as f:
         content = f.read()
 
+    # Convert snake_case to PascalCase for the C++ class name
+    class_name = "".join(word.capitalize() for word in component_name.split('_'))
+    plugin_name = f"{pkg_name}::{class_name}"
+
     new_component_block = f"""
         ComposableNode(
             package='{pkg_name}',
-            plugin='{component_name}',
-            name='{component_name}'
+            plugin='{plugin_name}',
+            name='{component_name.lower()}'
         ),
 """
 
-    if f"plugin='{component_name}'" in content:
+    if plugin_name in content:
         click.secho(f"Launch file already contains '{component_name}'.", fg="yellow")
         return
 
     # Insert the new component block into the composable_nodes list.
-    updated_content = re.sub(r"(composable_nodes\s*=\s*\[\n)",
-                           rf"\g<1>{new_component_block}",
-                           content)
+    updated_content = re.sub(r"(composable_nodes\s*=\s*\[\n)", rf"\g<1>{new_component_block}", content)
 
     with open(launch_file, 'w') as f:
         f.write(updated_content)
 
     click.secho(f"✓ Added '{component_name}' to mixed launch file: {launch_file}", fg="green")
+
 
 def add_default_launch_file(pkg_name):
     """Auto-generates a default.launch.py that includes the main package launch file."""

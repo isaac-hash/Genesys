@@ -3,7 +3,7 @@ from launch_ros.actions import Node, ComposableNodeContainer
 from launch_ros.descriptions import ComposableNode
 
 def generate_launch_description():
-    
+
     # -----------------------------
     # Regular ROS 2 Nodes (non-composable)
     # -----------------------------
@@ -23,9 +23,9 @@ def generate_launch_description():
     composable_nodes = [
         # Example C++ composable node:
         # ComposableNode(
-        #     package='cpp_pkg',
-        #     plugin='cpp_pkg::CppComponent',
-        #     name='cpp_component'
+        #     package='{{ package_name }}',
+        #     plugin='{{ package_name }}::{{ class_name }}',  # Must match XML type
+        #     name='{{ node_name }}',                        # Any ROS node name
         # ),
         
         # Example Python composable node:
@@ -42,7 +42,7 @@ def generate_launch_description():
     container = ComposableNodeContainer(
         name='component_container',
         namespace='',
-        package='rclcpp_components',  # Use 'rclpy_components' for Python composable nodes
+        package='rclcpp_components',  # Use 'rclpy_components' for Python
         executable='component_container',
         composable_node_descriptions=composable_nodes,
         output='screen',

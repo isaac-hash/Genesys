@@ -2,3 +2,7 @@
 // It includes all C++ component headers for compilation into the component library.
 
 #include "{{ package_name }}/{{ class_name }}.hpp"
+#include "rclcpp_components/register_node_macro.hpp"
+
+// Register component for rclcpp_components
+RCLCPP_COMPONENTS_REGISTER_NODE({{ package_name }}::{{ class_name }})
