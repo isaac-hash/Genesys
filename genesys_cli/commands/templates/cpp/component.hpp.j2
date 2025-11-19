@@ -1,0 +1,23 @@
+#ifndef {{ package_name | upper }}_{{ class_name | upper }}_HPP_
+#define {{ package_name | upper }}_{{ class_name | upper }}_HPP_
+
+#include "rclcpp/rclcpp.hpp"
+#include "std_msgs/msg/string.hpp"
+
+namespace {{ package_name }}
+{
+
+class {{ class_name }} : public rclcpp::Node
+{
+public:
+  explicit {{ class_name }}(const rclcpp::NodeOptions & options);
+
+private:
+  void timer_callback();
+  rclcpp::Publisher<std_msgs::msg::String>::SharedPtr publisher_;
+  rclcpp::TimerBase::SharedPtr timer_;
+};
+
+}  // namespace {{ package_name }}
+
+#endif  // {{ package_name | upper }}_{{ class_name | upper }}_HPP_

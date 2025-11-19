@@ -63,3 +63,51 @@ def get_cmakelists_template(package_name):
 
     template = env.get_template('cmakelists.txt.j2')
     return template.render(package_name=package_name)
+
+def get_cpp_component_templates(component_type, pkg_name, class_name, component_description):
+    """
+    Returns the boilerplate for C++ component header, source,
+    initial registration file content, and initial plugin XML file content.
+    """
+    env = Environment(
+        loader=FileSystemLoader(os.path.join(os.path.dirname(__file__), 'templates', 'cpp')),
+        trim_blocks=True,
+        lstrip_blocks=True
+    )
+
+    # Load full templates for .hpp and .cpp
+    hpp_template = env.get_template('component.hpp.j2')
+    hpp_content = hpp_template.render(package_name=pkg_name, class_name=class_name)
+
+    cpp_template = env.get_template('component.cpp.j2')
+    cpp_content = cpp_template.render(
+        package_name=pkg_name,
+        class_name=class_name,
+        component_name=class_name.lower(), # Assuming component_name is lowercased class_name
+        component_type=component_type
+    )
+
+    # Load initial full file content for register_components.cpp and plugin.xml
+    # These are for the *first* component in the package.
+    register_components_template = env.get_template('register_components.cpp.j2')
+    initial_register_content = register_components_template.render(package_name=pkg_name, class_name=class_name)
+
+    plugin_xml_template = env.get_template('plugin.xml.j2')
+    initial_plugin_content = plugin_xml_template.render(
+        package_name=pkg_name,
+        class_name=class_name,
+        component_description=component_description
+    )
+
+    return hpp_content, cpp_content, initial_register_content, initial_plugin_content
+
+def get_cpp_component_cmakelists_template(context):
+    """Returns the boilerplate for a C++ component CMakeLists.txt file."""
+    env = Environment(
+        loader=FileSystemLoader(os.path.join(os.path.dirname(__file__), 'templates', 'cpp')),
+        trim_blocks=True,
+        lstrip_blocks=True
+    )
+
+    template = env.get_template('cmakelists_component.txt.j2')
+    return template.render(**context)

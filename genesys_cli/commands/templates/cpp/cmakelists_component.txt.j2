@@ -1,0 +1,66 @@
+cmake_minimum_required(VERSION 3.8)
+project({{ package_name }})
+
+if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+  add_compile_options(-Wall -Wextra -Wpedantic)
+endif()
+
+# Find dependencies
+find_package(ament_cmake REQUIRED)
+find_package(rclcpp REQUIRED)
+find_package(rclcpp_components REQUIRED)
+find_package(std_msgs REQUIRED)
+
+# Component library
+add_library({{ package_name }}_components SHARED
+  src/register_components.cpp
+{%- for component in components %}
+  src/{{ component.class_name }}.cpp
+{%- endfor %}
+)
+
+target_include_directories({{ package_name }}_components PUBLIC
+  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+  $<INSTALL_INTERFACE:include>
+)
+
+ament_target_dependencies({{ package_name }}_components
+  rclcpp
+  rclcpp_components
+  std_msgs
+)
+
+rclcpp_components_register_nodes(
+  {{ package_name }}_components
+{%- for component in components %}
+  "{{ package_name }}::{{ component.class_name }}"
+{%- endfor %}
+)
+
+# Install targets
+install(TARGETS
+  {{ package_name }}_components
+  ARCHIVE DESTINATION lib
+  LIBRARY DESTINATION lib
+  RUNTIME DESTINATION bin
+)
+
+install(FILES
+  resource/{{ package_name }}_plugin.xml
+  DESTINATION share/${PROJECT_NAME}
+)
+
+install(
+  DIRECTORY launch
+  DESTINATION share/${PROJECT_NAME}
+)
+
+# Optional testing/linting
+if(BUILD_TESTING)
+  find_package(ament_lint_auto REQUIRED)
+  set(ament_cmake_copyright_FOUND TRUE)
+  set(ament_cmake_cpplint_FOUND TRUE)
+  ament_lint_auto_find_test_dependencies()
+endif()
+
+ament_package()

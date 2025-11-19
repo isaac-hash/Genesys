@@ -2,6 +2,7 @@ import os
 import re
 import click
 import sys
+from genesys_cli.commands.templates import get_cpp_component_templates
 
 def persist_workspace_sourcing():
     """Appends the workspace sourcing command to the user's shell startup file."""
@@ -56,7 +57,7 @@ def add_python_entry_point(pkg_name, node_name):
 
     # Use re.DOTALL to match newlines. Use named groups for clarity.
     match = re.search(
-        r'(?P<pre>(["\'])console_scripts\2\s*:\s*\[)(?P<scripts>.*?)(?P<post>\])',
+        r'(?P<pre>([""])console_scripts\2\s*:\s*\[)(?P<scripts>.*?)(?P<post>\])',
         content,
         re.DOTALL
     )
@@ -127,7 +128,7 @@ def add_python_component_entry_point(pkg_name, component_name):
 
     # Use re.DOTALL to match newlines. Use named groups for clarity.
     match = re.search(
-        r'(?P<pre>(["\'])rclpy_components\2\s*:\s*\[)(?P<scripts>.*?)(?P<post>\])',
+        r'(?P<pre>([""])rclpy_components\2\s*:\s*\[)(?P<scripts>.*?)(?P<post>\])',
         content,
         re.DOTALL
     )
@@ -270,8 +271,7 @@ def add_cpp_executable(pkg_name, node_name):
             lines.insert(insert_after_idx + 1, "".join(new_find_packages))
 
     # --- Build the new executable block ---
-    new_block = f'''
-add_executable({node_name} {node_src_file})
+    new_block = f'''\nadd_executable({node_name} {node_src_file})
     ament_target_dependencies({node_name}
       rclcpp
       std_msgs
@@ -423,7 +423,8 @@ def add_node_to_mixed_launch(pkg_name, node_name):
     with open(launch_file, 'r') as f:
         content = f.read()
 
-    new_node_block = f"""        Node(
+    new_node_block = f"""
+        Node(
             package='{pkg_name}',
             executable='{node_name}',
             name='{node_name}'
@@ -453,26 +454,30 @@ def add_component_to_mixed_launch(pkg_name, component_name):
     with open(launch_file, 'r') as f:
         content = f.read()
 
-    new_component_block = f"""        ComposableNode(
+    # Convert snake_case to PascalCase for the C++ class name
+    class_name = "".join(word.capitalize() for word in component_name.split('_'))
+    plugin_name = f"{pkg_name}::{class_name}"
+
+    new_component_block = f"""
+        ComposableNode(
             package='{pkg_name}',
-            plugin='{component_name}',
-            name='{component_name}'
+            plugin='{plugin_name}',
+            name='{component_name.lower()}'
         ),
 """
 
-    if f"plugin='{component_name}'" in content:
+    if plugin_name in content:
         click.secho(f"Launch file already contains '{component_name}'.", fg="yellow")
         return
 
     # Insert the new component block into the composable_nodes list.
-    updated_content = re.sub(r"(composable_nodes\s*=\s*\[\n)",
-                           rf"\g<1>{new_component_block}",
-                           content)
+    updated_content = re.sub(r"(composable_nodes\s*=\s*\[\n)", rf"\g<1>{new_component_block}", content)
 
     with open(launch_file, 'w') as f:
         f.write(updated_content)
 
     click.secho(f"✓ Added '{component_name}' to mixed launch file: {launch_file}", fg="green")
+
 
 def add_default_launch_file(pkg_name):
     """Auto-generates a default.launch.py that includes the main package launch file."""
@@ -524,15 +529,19 @@ def add_cpp_dependencies_to_package_xml(pkg_name, dependencies):
     # Find the buildtool_depend to insert after
     buildtool_depend_match = re.search(r'(<buildtool_depend>ament_cmake</buildtool_depend>)', content)
     if not buildtool_depend_match:
-        click.secho(f"Warning: Could not find <buildtool_depend> in {package_xml_file}. Cannot add dependencies.", fg="yellow")
-        return
+        buildtool_depend_match = re.search(r'(<buildtool_depend>ament_cmakepp</buildtool_depend>)', content)
+        if not buildtool_depend_match:
+            click.secho(f"Warning: Could not find <buildtool_depend> in {package_xml_file}. Cannot add dependencies.", fg="yellow")
+            return
 
     insertion_point = buildtool_depend_match.end()
     
     deps_to_add_str = ""
     for dep in dependencies:
-        if f"<depend>{dep}</depend>" not in content:
-            deps_to_add_str += f"\n  <depend>{dep}</depend>"
+        if f"<build_depend>{dep}</build_depend>" not in content:
+            deps_to_add_str += f"\n  <build_depend>{dep}</build_depend>"
+        if f"<exec_depend>{dep}</exec_depend>" not in content:
+            deps_to_add_str += f"\n  <exec_depend>{dep}</exec_depend>"
 
     if deps_to_add_str:
         updated_content = content[:insertion_point] + deps_to_add_str + content[insertion_point:]
@@ -637,12 +646,13 @@ def add_component_to_regular_launch(pkg_name, component_name):
             nodes_in_ld = match_return.group('nodes').strip()
             
             container_ref_to_add = "container"
-            if nodes_in_ld:
-                # If there are existing nodes, add a comma before inserting the container reference
-                container_ref_to_add = ",\n        " + container_ref_to_add
-            else:
-                # If no existing nodes, just add the container reference with proper indentation
-                container_ref_to_add = "\n        " + container_ref_to_add
+            # if nodes_in_ld:
+            #     # If there are existing nodes, add a comma before inserting the container reference
+            #     container_ref_to_add = ",\n        " + container_ref_to_add
+            # else:
+            #     # If no existing nodes, just add the container reference with proper indentation
+            #     container_ref_to_add = "\n        " + container_ref_to_add
+            container_ref_to_add = "\n        " + container_ref_to_add + ",\n"
 
             # Insert the container reference into the LaunchDescription list
             content = content[:insertion_point_for_container_ref] + container_ref_to_add + content[insertion_point_for_container_ref:]
@@ -668,3 +678,162 @@ def add_component_to_regular_launch(pkg_name, component_name):
         f.write(content)
 
     click.secho(f"✓ Added '{component_name}' to regular launch file: {launch_file}", fg="green")
+
+
+def make_cpp_component(pkg_name, component_name, component_type):
+    """Creates a new C++ component and registers it in the package."""
+    
+    class_name = "".join(word.capitalize() for word in component_name.split('_'))
+    
+    # 1. Get templates
+    hpp_content, cpp_content, register_content, plugin_content = get_cpp_component_templates(component_type, pkg_name, class_name, f"A C++ component of type {component_type}")
+
+    # 2. Create directories
+    pkg_path = os.path.join('src', pkg_name)
+    include_dir = os.path.join(pkg_path, 'include', pkg_name)
+    src_dir = os.path.join(pkg_path, 'src')
+    resource_dir = os.path.join(pkg_path, 'resource')
+    os.makedirs(include_dir, exist_ok=True)
+    os.makedirs(src_dir, exist_ok=True)
+    os.makedirs(resource_dir, exist_ok=True)
+
+    # 3. Create component files
+    hpp_file_path = os.path.join(include_dir, f"{class_name}.hpp")
+    cpp_file_path = os.path.join(src_dir, f"{class_name}.cpp")
+
+    with open(hpp_file_path, 'w') as f:
+        f.write(hpp_content)
+    click.secho(f"✓ Created C++ component header: {hpp_file_path}", fg="green")
+
+    with open(cpp_file_path, 'w') as f:
+        f.write(cpp_content)
+    click.secho(f"✓ Created C++ component source: {cpp_file_path}", fg="green")
+
+    # 4. Create or update register_components.cpp
+    register_components_path = os.path.join(src_dir, "register_components.cpp")
+
+    if os.path.exists(register_components_path):
+        # Append the new component's header include
+        include_line = f'#include "{pkg_name}/{class_name}.hpp"'
+        # Check if the include line already exists to prevent duplicates
+        with open(register_components_path, "r") as read_f:
+            current_content = read_f.read()
+        if include_line not in current_content:
+            with open(register_components_path, "a") as f:
+                f.write(f"\n{include_line}")
+            click.secho(
+                f"✓ Added include for '{class_name}.hpp' to {register_components_path}",
+                fg="green",
+            )
+        else:
+            click.secho(
+                f"Include for '{class_name}.hpp' already exists in {register_components_path}",
+                fg="yellow",
+            )
+    else:
+        with open(register_components_path, "w") as f:
+            f.write(register_content)
+        click.secho(
+            f"✓ Created component registration file: {register_components_path}",
+            fg="green",
+        )
+
+    # 5. Create or update plugin.xml
+    plugin_xml_path = os.path.join(resource_dir, f"{pkg_name}_plugin.xml")
+
+    if os.path.exists(plugin_xml_path):
+        with open(plugin_xml_path, "r+") as f:
+            content = f.read()
+            plugin_entry_snippet = (
+                f'  <class type="{pkg_name}::{class_name}" base_class_type="rclcpp::Node">\n'
+                f"    <description>A C++ component of type {component_type}</description>\n"
+                "  </class>"
+            )
+            if (
+                f'type="{pkg_name}::{class_name}"' not in content
+            ):  # Check if this specific component is already registered
+                # Insert before the closing </library> tag
+                updated_content = content.replace(
+                    "</library>", f"{plugin_entry_snippet}\n</library>"
+                )
+                f.seek(0)  # Rewind to the beginning of the file
+                f.write(updated_content)
+                f.truncate()  # Truncate any remaining old content
+                click.secho(
+                    f"✓ Added component entry to plugin XML: {plugin_xml_path}",
+                    fg="green",
+                )
+            else:
+                click.secho(
+                    f"Component entry for '{class_name}' already exists in {plugin_xml_path}",
+                    fg="yellow",
+                )
+    else:
+        with open(plugin_xml_path, "w") as f:
+            f.write(plugin_content)
+        click.secho(f"✓ Created plugin XML file: {plugin_xml_path}", fg="green")
+
+    # 6. Update CMakeLists.txt
+    cmake_path = os.path.join(pkg_path, "CMakeLists.txt")
+    from genesys_cli.commands.templates import get_cpp_component_cmakelists_template
+
+    # Check existing components to avoid duplicates and build a list
+    existing_components = []
+    if os.path.exists(cmake_path):
+        with open(cmake_path, "r") as f:
+            content = f.read()
+            # Find existing components by looking at the source files listed in add_library
+            # This regex needs to be robust to handle multiple lines and different formatting
+            add_library_match = re.search(
+                r"add_library\(\s*(\w+)_components\s*SHARED\s*(.*?)\)",
+                content,
+                re.DOTALL,
+            )
+            if add_library_match:
+                sources_block = add_library_match.group(2)
+                matches = re.findall(r"src/(\w+)\.cpp", sources_block)
+                for match in matches:
+                    if (
+                        match != "register_components"
+                    ):  # register_components.cpp is a special source file
+                        existing_components.append({"class_name": match})
+
+    # Add the new component if it's not already in the list
+    if not any(c['class_name'] == class_name for c in existing_components):
+        existing_components.append({'class_name': class_name})
+
+    # Render the new CMakeLists.txt from the component template
+    context = {"package_name": pkg_name, "components": existing_components}
+    cmakelists_content = get_cpp_component_cmakelists_template(context)
+    with open(cmake_path, "w") as f:
+        f.write(cmakelists_content)
+    click.secho(f"✓ Updated CMakeLists.txt", fg="green")
+
+    # 7. Update package.xml
+    add_cpp_dependencies_to_package_xml(pkg_name, ["rclcpp", "rclcpp_components"])
+    package_xml_path = os.path.join(pkg_path, "package.xml")
+    with open(package_xml_path, "r") as f:
+        package_xml_content = f.read()
+
+    if "<export>" not in package_xml_content:
+        package_xml_content = package_xml_content.replace(
+            "</package>", "<export></export>\n</package>"
+        )
+
+    if f'plugin="resource/{pkg_name}_plugin.xml"' not in package_xml_content:
+        export_tag = (
+            "<export>\n"
+            f'    <rclcpp_components plugin="resource/{pkg_name}_plugin.xml"/>\n'
+            "  </export>"
+        )
+        if "<export/>" in package_xml_content:
+            package_xml_content = package_xml_content.replace("<export/>", export_tag)
+        else:
+            package_xml_content = package_xml_content.replace(
+                "<export>",
+                f'<export>\n    <rclcpp_components plugin="resource/{pkg_name}_plugin.xml"/>',
+            )
+
+    with open(package_xml_path, "w") as f:
+        f.write(package_xml_content)
+    click.secho(f"✓ Updated package.xml", fg="green")

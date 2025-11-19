@@ -1,0 +1,20 @@
+#pragma once
+
+#include "rclcpp/rclcpp.hpp"
+#include "std_msgs/msg/string.hpp"
+
+namespace {{ pkg }}
+{
+
+class {{ name }} : public rclcpp::Node
+{
+public:
+    explicit {{ name }}(const rclcpp::NodeOptions & options);
+
+private:
+    void topic_callback(const std_msgs::msg::String & msg) const;
+
+    rclcpp::Subscription<std_msgs::msg::String>::SharedPtr subscription_;
+};
+
+} // namespace {{ pkg }}

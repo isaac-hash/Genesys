@@ -17,8 +17,9 @@ from genesys_cli.scaffolding import (
     add_component_to_mixed_launch,
     add_default_launch_file,
     add_component_to_regular_launch,
+    make_cpp_component,
 )
-from .templates import get_python_node_template, get_python_component_template, get_mixed_launch_template, get_cpp_node_template, get_cmakelists_template
+from .templates import get_python_node_template, get_python_component_template, get_mixed_launch_template, get_cpp_node_template, get_cmakelists_template, get_cpp_component_templates
 
 def _get_choice_from_numbered_list(prompt_message, choices, default_index=0):
     """
@@ -199,11 +200,10 @@ def make_component(ctx, component_name, pkg_name):
         click.secho(f"Error: Package '{pkg_name}' not found at {pkg_path}", fg="red")
         sys.exit(1)
 
-    class_name = "".join(word.capitalize() for word in component_name.split('_'))
-
     # Determine package type and create node
     if os.path.exists(os.path.join(pkg_path, 'setup.py')):
         # Python package
+        class_name = "".join(word.capitalize() for word in component_name.split('_'))
         comp_dir = os.path.join(pkg_path, pkg_name)
         os.makedirs(comp_dir, exist_ok=True)
         comp_file = os.path.join(comp_dir, f"{component_name}.py")
@@ -230,8 +230,32 @@ def make_component(ctx, component_name, pkg_name):
             ctx.invoke(make_launch, pkg_name=pkg_name, launch_name='mixed_launch')
             add_component_to_mixed_launch(pkg_name, component_name)
             add_default_launch_file(pkg_name) # Ensure default launch file includes the mixed launch
+    elif os.path.exists(os.path.join(pkg_path, 'CMakeLists.txt')):
+        # Create C++ component files
+        make_cpp_component(pkg_name, component_name, component_type)
+
+        # Ensure launch/ exists
+        launch_dir = os.path.join(pkg_path, 'launch')
+        os.makedirs(launch_dir, exist_ok=True)
+
+        # Create mixed launch file if missing
+        launch_file = os.path.join(launch_dir, 'mixed_launch.py')
+        if not os.path.exists(launch_file):
+            click.secho(f"No launch file found for '{pkg_name}'. Creating mixed launch...", fg="yellow")
+            with open(launch_file, 'w') as f:
+                f.write(get_mixed_launch_template())
+
+        # Add component to the mixed launch
+        add_component_to_mixed_launch(pkg_name, component_name)
+
+        # Add default launch file (pkg_launch.py → includes mixed launch)
+        add_default_launch_file(pkg_name)
+
+        # Add install rules to CMakeLists.txt
+        add_install_rule_for_launch_dir_cpp(pkg_name)
+
     else:
-        click.secho(f"Error: Could not determine package type for '{pkg_name}'. No setup.py found.", fg="red")
+        click.secho(f"Error: Could not determine package type for '{pkg_name}'. No setup.py or CMakeLists.txt found.", fg="red")
         sys.exit(1)
 
     click.echo("\nRun 'genesys build' to make the new component available.")
