@@ -3,6 +3,9 @@
 
 #include "{{ package_name }}/{{ class_name }}.hpp"
 #include "rclcpp_components/register_node_macro.hpp"
-
+namespace {{ package_name }}
+{
+  // nothing else needed here
+}
 // Register component for rclcpp_components
 RCLCPP_COMPONENTS_REGISTER_NODE({{ package_name }}::{{ class_name }})

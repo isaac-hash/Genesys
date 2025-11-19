@@ -5,28 +5,70 @@ if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
   add_compile_options(-Wall -Wextra -Wpedantic)
 endif()
 
-# find dependencies
+# --- Find dependencies ---
 find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)
-find_package(std_msgs REQUIRED)
 find_package(rclcpp_lifecycle REQUIRED)
+find_package(rclcpp_components REQUIRED)
+find_package(std_msgs REQUIRED)
+find_package(pluginlib REQUIRED)
 
-# Build executables from source files
-# Add your source files here as needed:
-# add_executable(my_node src/my_node.cpp)
-# ament_target_dependencies(my_node rclcpp std_msgs)
-# install(TARGETS my_node DESTINATION lib/${PROJECT_NAME})
+# --- REGULAR NODES INSERTION POINT ---
 
+# --- Component library ---
+# This library is for all components in the package.
+add_library({{ package_name }}_components SHARED
+  src/register_components.cpp
+  # --- COMPONENTS INSERTION POINT ---
+)
+
+target_include_directories({{ package_name }}_components PUBLIC
+  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+  $<INSTALL_INTERFACE:include/${PROJECT_NAME}>
+)
+
+ament_target_dependencies({{ package_name }}_components
+  rclcpp
+  rclcpp_components
+  std_msgs
+  pluginlib
+)
+
+rclcpp_components_register_nodes({{ package_name }}_components
+  # --- COMPONENTS REGISTER INSERTION POINT ---
+)
+
+# --- Installation Rules ---
+install(TARGETS 
+  {{ package_name }}_components
+  DESTINATION lib
+)
+
+# Install the plugin XML file.
+install(
+  FILES resource/{{ package_name }}_plugin.xml
+  DESTINATION share/{{ package_name }}
+)
+
+# Install the package include directory.
+install(
+  DIRECTORY include/
+  DESTINATION include
+)
+
+# Install launch files.
+install(
+  DIRECTORY launch
+  DESTINATION share/{{ package_name }}
+)
+
+# --- Testing / linting ---
 if(BUILD_TESTING)
   find_package(ament_lint_auto REQUIRED)
-  # the following line skips the linter which checks for copyrights
-  # comment the line when a copyright and license is added to all source files
   set(ament_cmake_copyright_FOUND TRUE)
-  # the following line skips cpplint (only works in a git repo)
-  # comment the line when this package is in a git repo and when
-  # a copyright and license is added to all source files
   set(ament_cmake_cpplint_FOUND TRUE)
   ament_lint_auto_find_test_dependencies()
 endif()
 
+# --- Must be last ---
 ament_package()
