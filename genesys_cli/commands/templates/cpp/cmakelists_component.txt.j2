@@ -10,50 +10,45 @@ find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(rclcpp_components REQUIRED)
 find_package(std_msgs REQUIRED)
+find_package(pluginlib REQUIRED)
 
-# Component library
 add_library({{ package_name }}_components SHARED
   src/register_components.cpp
-{%- for component in components %}
+  {% for component in components %}
   src/{{ component.class_name }}.cpp
-{%- endfor %}
-)
-
-target_include_directories({{ package_name }}_components PUBLIC
-  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
-  $<INSTALL_INTERFACE:include>
+  {% endfor %}
 )
 
 ament_target_dependencies({{ package_name }}_components
   rclcpp
   rclcpp_components
   std_msgs
+  pluginlib
 )
 
-rclcpp_components_register_nodes(
-  {{ package_name }}_components
-{%- for component in components %}
+# Note: The user's feedback suggests this format.
+# This registers each component class with the library.
+rclcpp_components_register_nodes({{ package_name }}_components
+  {% for component in components %}
   "{{ package_name }}::{{ component.class_name }}"
-{%- endfor %}
-)
-
-# Install targets
-install(TARGETS
-  {{ package_name }}_components
-  ARCHIVE DESTINATION lib
-  LIBRARY DESTINATION lib
-  RUNTIME DESTINATION bin
-)
-
-install(FILES
-  resource/{{ package_name }}_plugin.xml
-  DESTINATION share/${PROJECT_NAME}
+  {% endfor %}
 )
 
 install(
-  DIRECTORY launch
-  DESTINATION share/${PROJECT_NAME}
+  TARGETS {{ package_name }}_components
+  DESTINATION lib
 )
+
+install(
+  FILES resource/{{ package_name }}_plugin.xml
+  DESTINATION share/{{ package_name }}
+)
+
+install(
+  DIRECTORY include/
+  DESTINATION include
+)
+
 
 # Optional testing/linting
 if(BUILD_TESTING)
