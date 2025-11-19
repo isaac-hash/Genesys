@@ -907,3 +907,38 @@ def make_cpp_component(pkg_name, component_name, component_type):
     with open(package_xml_path, "w") as f:
         f.write(package_xml_content)
     click.secho(f"✓ Updated package.xml", fg="green")
+
+def make_cpp_node(pkg_name, node_name, node_type):
+    """Creates a new C++ node and registers it in the package."""
+    
+    class_name = "".join(word.capitalize() for word in node_name.split('_'))
+    
+    # 1. Get templates
+    from genesys_cli.commands.templates import get_cpp_node_template, get_cpp_node_header_template
+    hpp_content = get_cpp_node_header_template(node_type, pkg_name, class_name)
+    cpp_content = get_cpp_node_template(node_type, pkg_name, class_name)
+
+    # 2. Create directories
+    pkg_path = os.path.join('src', pkg_name)
+    include_dir = os.path.join(pkg_path, 'include', pkg_name)
+    src_dir = os.path.join(pkg_path, 'src')
+    os.makedirs(include_dir, exist_ok=True)
+    os.makedirs(src_dir, exist_ok=True)
+
+    # 3. Create node files
+    hpp_file_path = os.path.join(include_dir, f"{class_name}.hpp")
+    cpp_file_path = os.path.join(src_dir, f"{node_name}.cpp")
+
+    with open(hpp_file_path, 'w') as f:
+        f.write(hpp_content)
+    click.secho(f"✓ Created C++ node header: {hpp_file_path}", fg="green")
+
+    with open(cpp_file_path, 'w') as f:
+        f.write(cpp_content)
+    click.secho(f"✓ Created C++ node source: {cpp_file_path}", fg="green")
+
+    # 4. Update CMakeLists.txt to add the executable
+    add_cpp_executable(pkg_name, node_name)
+
+    # 5. Update package.xml with dependencies
+    add_cpp_dependencies_to_package_xml(pkg_name, ["rclcpp", "std_msgs"])

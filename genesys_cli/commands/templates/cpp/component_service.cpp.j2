@@ -1,13 +1,15 @@
 #include "{{ package_name }}/{{ class_name }}.hpp"
 
+#include "rclcpp_components/register_node_macro.hpp"
+
 #include <functional>
 #include <memory>
 
 namespace {{ package_name }}
 {
 
-{{ class_name }}::{{ class_name }}()
-: rclcpp::Node("{{ class_name | lower }}_service_server")
+{{ class_name }}::{{ class_name }}(const rclcpp::NodeOptions & options)
+: rclcpp::Node("{{ class_name | lower }}_service_server", options)
 {
     using namespace std::placeholders;
 
@@ -29,10 +31,4 @@ void {{ class_name }}::add_two_ints_callback(
 
 } // namespace {{ package_name }}
 
-int main(int argc, char * argv[])
-{
-    rclcpp::init(argc, argv);
-    rclcpp::spin(std::make_shared<{{ package_name }}::{{ class_name }}>());
-    rclcpp::shutdown();
-    return 0;
-}
+RCLCPP_COMPONENTS_REGISTER_NODE({{ package_name }}::{{ class_name }})
