@@ -4,7 +4,6 @@ project({{ package_name }})
 if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
   add_compile_options(-Wall -Wextra -Wpedantic)
 endif()
-
 # Find dependencies
 find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)
@@ -19,6 +18,11 @@ add_library({{ package_name }}_components SHARED
   {% endfor %}
 )
 
+target_include_directories({{ package_name }}_components PUBLIC
+  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+  $<INSTALL_INTERFACE:include/${PROJECT_NAME}>
+)
+
 ament_target_dependencies({{ package_name }}_components
   rclcpp
   rclcpp_components
@@ -26,8 +30,6 @@ ament_target_dependencies({{ package_name }}_components
   pluginlib
 )
 
-# Note: The user's feedback suggests this format.
-# This registers each component class with the library.
 rclcpp_components_register_nodes({{ package_name }}_components
   {% for component in components %}
   "{{ package_name }}::{{ component.class_name }}"
