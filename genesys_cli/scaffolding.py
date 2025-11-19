@@ -526,15 +526,19 @@ def add_cpp_dependencies_to_package_xml(pkg_name, dependencies):
     # Find the buildtool_depend to insert after
     buildtool_depend_match = re.search(r'(<buildtool_depend>ament_cmake</buildtool_depend>)', content)
     if not buildtool_depend_match:
-        click.secho(f"Warning: Could not find <buildtool_depend> in {package_xml_file}. Cannot add dependencies.", fg="yellow")
-        return
+        buildtool_depend_match = re.search(r'(<buildtool_depend>ament_cmakepp</buildtool_depend>)', content)
+        if not buildtool_depend_match:
+            click.secho(f"Warning: Could not find <buildtool_depend> in {package_xml_file}. Cannot add dependencies.", fg="yellow")
+            return
 
     insertion_point = buildtool_depend_match.end()
     
     deps_to_add_str = ""
     for dep in dependencies:
-        if f"<depend>{dep}</depend>" not in content:
-            deps_to_add_str += f"\n  <depend>{dep}</depend>"
+        if f"<build_depend>{dep}</build_depend>" not in content:
+            deps_to_add_str += f"\n  <build_depend>{dep}</build_depend>"
+        if f"<exec_depend>{dep}</exec_depend>" not in content:
+            deps_to_add_str += f"\n  <exec_depend>{dep}</exec_depend>"
 
     if deps_to_add_str:
         updated_content = content[:insertion_point] + deps_to_add_str + content[insertion_point:]
@@ -733,33 +737,31 @@ def make_cpp_component(pkg_name, component_name, component_type):
 
     # 6. Update CMakeLists.txt
     cmake_path = os.path.join(pkg_path, 'CMakeLists.txt')
-    with open(cmake_path, 'r') as f:
-        cmake_content = f.read()
+    from genesys_cli.commands.templates import get_cpp_component_cmakelists_template
 
-    if 'find_package(rclcpp_components REQUIRED)' not in cmake_content:
-        cmake_content = cmake_content.replace('find_package(ament_cmake REQUIRED)', 
-                                              'find_package(ament_cmake REQUIRED)\nfind_package(rclcpp_components REQUIRED)')
+    # Check existing components to avoid duplicates and build a list
+    existing_components = []
+    if os.path.exists(cmake_path):
+        with open(cmake_path, 'r') as f:
+            content = f.read()
+            # Find existing components by looking at the source files listed
+            matches = re.findall(r'src/(\w+)\.cpp', content)
+            for match in matches:
+                if match != 'register_components':
+                    existing_components.append({'class_name': match})
 
-    add_library_str = f'add_library({pkg_name}_components SHARED\n  src/register_components.cpp\n)'
-    if 'add_library' not in cmake_content:
-        cmake_content = cmake_content.replace('ament_package()', f'{add_library_str}\n\nament_package()')
+    # Add the new component if it's not already in the list
+    if not any(c['class_name'] == class_name for c in existing_components):
+        existing_components.append({'class_name': class_name})
 
-    register_node_str = f'rclcpp_components_register_nodes({pkg_name}_components "${{PROJECT_NAME}}::{class_name}")'
-    if 'rclcpp_components_register_nodes' not in cmake_content:
-        cmake_content = cmake_content.replace(add_library_str, f'{add_library_str}\n{register_node_str}')
-    else:
-        cmake_content = re.sub(r'(rclcpp_components_register_nodes\([^)]+)', f'\\1\n  "${{PROJECT_NAME}}::{class_name}"', cmake_content)
-
-    install_targets_str = f'install(TARGETS\n  {pkg_name}_components\n  ARCHIVE DESTINATION lib\n  LIBRARY DESTINATION lib\n  RUNTIME DESTINATION bin\n)'
-    if 'install(TARGETS' not in cmake_content:
-        cmake_content = cmake_content.replace('ament_package()', f'{install_targets_str}\n\nament_package()')
-
-    install_plugin_str = f'install(FILES\n  resource/{pkg_name}_plugin.xml\n  DESTINATION share/${{PROJECT_NAME}}\n)'
-    if 'install(FILES' not in cmake_content:
-        cmake_content = cmake_content.replace('ament_package()', f'{install_plugin_str}\n\nament_package()')
-
+    # Render the new CMakeLists.txt from the component template
+    context = {
+        'package_name': pkg_name,
+        'components': existing_components
+    }
+    cmakelists_content = get_cpp_component_cmakelists_template(context)
     with open(cmake_path, 'w') as f:
-        f.write(cmake_content)
+        f.write(cmakelists_content)
     click.secho(f"✓ Updated CMakeLists.txt", fg="green")
 
     # 7. Update package.xml
