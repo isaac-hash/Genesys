@@ -4,10 +4,12 @@ NOTICE.txt
 README.md
 org.txt
 pyproject.toml
+setup.py
 genesys/__init__.py
 genesys/decorators.py
 genesys/genesys.cmake
 genesys/helpers.py
+genesys/node_base.py
 genesys/cmake/genesysConfig.cmake
 genesys/include/genesys/macros.hpp
 genesys/resource/genesys
@@ -21,6 +23,7 @@ genesys_cli/commands/doctor.py
 genesys_cli/commands/launch.py
 genesys_cli/commands/make.py
 genesys_cli/commands/new.py
+genesys_cli/commands/pipeline.py
 genesys_cli/commands/ros.py
 genesys_cli/commands/rqt.py
 genesys_cli/commands/run.py

@@ -2,6 +2,7 @@ import os
 import re
 import click
 import sys
+from genesys_cli.commands.templates import get_cpp_component_templates
 
 def persist_workspace_sourcing():
     """Appends the workspace sourcing command to the user's shell startup file."""
@@ -525,15 +526,19 @@ def add_cpp_dependencies_to_package_xml(pkg_name, dependencies):
     # Find the buildtool_depend to insert after
     buildtool_depend_match = re.search(r'(<buildtool_depend>ament_cmake</buildtool_depend>)', content)
     if not buildtool_depend_match:
-        click.secho(f"Warning: Could not find <buildtool_depend> in {package_xml_file}. Cannot add dependencies.", fg="yellow")
-        return
+        buildtool_depend_match = re.search(r'(<buildtool_depend>ament_cmakepp</buildtool_depend>)', content)
+        if not buildtool_depend_match:
+            click.secho(f"Warning: Could not find <buildtool_depend> in {package_xml_file}. Cannot add dependencies.", fg="yellow")
+            return
 
     insertion_point = buildtool_depend_match.end()
     
     deps_to_add_str = ""
     for dep in dependencies:
-        if f"<depend>{dep}</depend>" not in content:
-            deps_to_add_str += f"\n  <depend>{dep}</depend>"
+        if f"<build_depend>{dep}</build_depend>" not in content:
+            deps_to_add_str += f"\n  <build_depend>{dep}</build_depend>"
+        if f"<exec_depend>{dep}</exec_depend>" not in content:
+            deps_to_add_str += f"\n  <exec_depend>{dep}</exec_depend>"
 
     if deps_to_add_str:
         updated_content = content[:insertion_point] + deps_to_add_str + content[insertion_point:]
@@ -735,27 +740,92 @@ def make_cpp_component(pkg_name, component_name, component_type):
     with open(cmake_path, 'r') as f:
         cmake_content = f.read()
 
+    # Ensure find_package(rclcpp_components REQUIRED) is present
     if 'find_package(rclcpp_components REQUIRED)' not in cmake_content:
         cmake_content = cmake_content.replace('find_package(ament_cmake REQUIRED)', 
                                               'find_package(ament_cmake REQUIRED)\nfind_package(rclcpp_components REQUIRED)')
+    # Ensure find_package(std_msgs REQUIRED) is present
+    if 'find_package(std_msgs REQUIRED)' not in cmake_content:
+        cmake_content = cmake_content.replace('find_package(ament_cmake REQUIRED)', 
+                                              'find_package(ament_cmake REQUIRED)\nfind_package(std_msgs REQUIRED)')
 
+    # Ensure add_library for components is present
     add_library_str = f'add_library({pkg_name}_components SHARED\n  src/register_components.cpp\n)'
-    if 'add_library' not in cmake_content:
-        cmake_content = cmake_content.replace('ament_package()', f'{add_library_str}\n\nament_package()')
+    if add_library_str not in cmake_content: # Check for exact string to avoid partial matches
+        # Find a suitable place to insert add_library, e.g., before ament_package()
+        ament_package_match = re.search(r'ament_package\(\)', cmake_content)
+        if ament_package_match:
+            cmake_content = cmake_content[:ament_package_match.start()] + add_library_str + '\n' + \
+                            f'''target_include_directories({pkg_name}_components PUBLIC
+  $<BUILD_INTERFACE:${{CMAKE_CURRENT_SOURCE_DIR}}/include>
+  $<INSTALL_INTERFACE:include>)
 
+''' + cmake_content[ament_package_match.start():]
+        else:
+            click.secho(f"Warning: Could not find 'ament_package()' in {cmake_path}. Cannot add add_library.", fg="yellow")
+
+    # Ensure rclcpp_components and std_msgs are in ament_target_dependencies for the component library
+    ament_target_deps_pattern = r'(ament_target_dependencies\(\s*' + re.escape(pkg_name) + r'_components\s*)([^)]*)(\))'
+    match = re.search(ament_target_deps_pattern, cmake_content, re.DOTALL)
+
+    if match:
+        current_deps = match.group(2)
+        deps_to_add = []
+        if 'rclcpp_components' not in current_deps:
+            deps_to_add.append('rclcpp_components')
+        if 'std_msgs' not in current_deps:
+            deps_to_add.append('std_msgs')
+        
+        if deps_to_add:
+            new_deps = current_deps.strip()
+            for dep in deps_to_add:
+                new_deps += f'\n      {dep}'
+            cmake_content = cmake_content[:match.start(2)] + new_deps + cmake_content[match.end(2):]
+    else:
+        # If ament_target_dependencies for this component is not found, add it.
+        # This should ideally be placed after add_library.
+        ament_target_dependencies_str = f'''ament_target_dependencies({pkg_name}_components
+      rclcpp
+      rclcpp_components
+      std_msgs
+    )'''
+        # Find the end of the add_library block to insert after it
+        add_library_end_match = re.search(re.escape(add_library_str), cmake_content)
+        if add_library_end_match:
+            cmake_content = cmake_content[:add_library_end_match.end()] + '\n' + ament_target_dependencies_str + '\n' + cmake_content[add_library_end_match.end():]
+        else:
+            click.secho(f"Warning: Could not find 'add_library' for components in {cmake_path}. Cannot add ament_target_dependencies.", fg="yellow")
+
+    # Ensure rclcpp_components_register_nodes is present
     register_node_str = f'rclcpp_components_register_nodes({pkg_name}_components "${{PROJECT_NAME}}::{class_name}")'
     if 'rclcpp_components_register_nodes' not in cmake_content:
-        cmake_content = cmake_content.replace(add_library_str, f'{add_library_str}\n{register_node_str}')
+        # Find a suitable place to insert, e.g., after ament_target_dependencies
+        if match: # If ament_target_dependencies was found/added
+            cmake_content = cmake_content[:match.end()] + '\n' + register_node_str + '\n' + cmake_content[match.end():]
+        else: # Fallback if ament_target_dependencies was not found
+            click.secho(f"Warning: Could not find 'ament_target_dependencies' for components in {cmake_path}. Cannot add rclcpp_components_register_nodes.", fg="yellow")
     else:
-        cmake_content = re.sub(r'(rclcpp_components_register_nodes\([^)]+)', f'\\1\n  "${{PROJECT_NAME}}::{class_name}"', cmake_content)
+        # If it exists, ensure the current component is registered
+        if f'"{pkg_name}::{class_name}"' not in cmake_content:
+            cmake_content = re.sub(r'(rclcpp_components_register_nodes\([^)]+)', f'\\1\n  "${{PROJECT_NAME}}::{class_name}"', cmake_content)
 
+    # Ensure install(TARGETS ...) is present
     install_targets_str = f'install(TARGETS\n  {pkg_name}_components\n  ARCHIVE DESTINATION lib\n  LIBRARY DESTINATION lib\n  RUNTIME DESTINATION bin\n)'
     if 'install(TARGETS' not in cmake_content:
-        cmake_content = cmake_content.replace('ament_package()', f'{install_targets_str}\n\nament_package()')
+        ament_package_match = re.search(r'ament_package\(\)', cmake_content)
+        if ament_package_match:
+            cmake_content = cmake_content[:ament_package_match.start()] + install_targets_str + '\n\n' + cmake_content[ament_package_match.start():]
+        else:
+            click.secho(f"Warning: Could not find 'ament_package()' in {cmake_path}. Cannot add install(TARGETS).", fg="yellow")
 
+    # Ensure install(FILES ...) for plugin.xml is present
     install_plugin_str = f'install(FILES\n  resource/{pkg_name}_plugin.xml\n  DESTINATION share/${{PROJECT_NAME}}\n)'
     if 'install(FILES' not in cmake_content:
-        cmake_content = cmake_content.replace('ament_package()', f'{install_plugin_str}\n\nament_package()')
+        ament_package_match = re.search(r'ament_package\(\)', cmake_content)
+        if ament_package_match:
+            cmake_content = cmake_content[:ament_package_match.start()] + install_plugin_str + '\n\n' + cmake_content[ament_package_match.start():]
+        else:
+            click.secho(f"Warning: Could not find 'ament_package()' in {cmake_path}. Cannot add install(FILES).", fg="yellow")
 
     with open(cmake_path, 'w') as f:
         f.write(cmake_content)

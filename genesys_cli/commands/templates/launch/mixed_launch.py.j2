@@ -4,31 +4,49 @@ from launch_ros.descriptions import ComposableNode
 
 def generate_launch_description():
     
+    # -----------------------------
+    # Regular ROS 2 Nodes (non-composable)
+    # -----------------------------
     regular_nodes = [
-        # Add regular nodes here
+        # Example:
         # Node(
-        #     package='pkg',
-        #     executable='regular_exec',
-        #     name='regular'
+        #     package='pkg_name',
+        #     executable='exec_name',
+        #     name='node_name',
+        #     output='screen'
         # ),
     ]
 
+    # -----------------------------
+    # Composable Nodes (C++ or Python)
+    # -----------------------------
     composable_nodes = [
-        # Add composable nodes here
+        # Example C++ composable node:
         # ComposableNode(
-        #     package='pkg', 
-        #     plugin='plugin_name', 
-        #     name='component_name'
+        #     package='cpp_pkg',
+        #     plugin='cpp_pkg::CppComponent',
+        #     name='cpp_component'
+        # ),
+        
+        # Example Python composable node:
+        # ComposableNode(
+        #     package='py_pkg',
+        #     plugin='py_pkg.PyComponent',
+        #     name='py_component'
         # ),
     ]
 
+    # -----------------------------
+    # Composable Node Container
+    # -----------------------------
     container = ComposableNodeContainer(
         name='component_container',
         namespace='',
-        package='rclpy_components',
+        package='rclcpp_components',  # Use 'rclpy_components' for Python composable nodes
         executable='component_container',
         composable_node_descriptions=composable_nodes,
         output='screen',
     )
 
+    # Combine regular nodes and container
     return LaunchDescription(regular_nodes + [container])

@@ -231,8 +231,29 @@ def make_component(ctx, component_name, pkg_name):
             add_component_to_mixed_launch(pkg_name, component_name)
             add_default_launch_file(pkg_name) # Ensure default launch file includes the mixed launch
     elif os.path.exists(os.path.join(pkg_path, 'CMakeLists.txt')):
-        # C++ package
+        # Create C++ component files
         make_cpp_component(pkg_name, component_name, component_type)
+
+        # Ensure launch/ exists
+        launch_dir = os.path.join(pkg_path, 'launch')
+        os.makedirs(launch_dir, exist_ok=True)
+
+        # Create mixed launch file if missing
+        launch_file = os.path.join(launch_dir, 'mixed_launch.py')
+        if not os.path.exists(launch_file):
+            click.secho(f"No launch file found for '{pkg_name}'. Creating mixed launch...", fg="yellow")
+            with open(launch_file, 'w') as f:
+                f.write(get_mixed_launch_template())
+
+        # Add component to the mixed launch
+        add_component_to_mixed_launch(pkg_name, component_name)
+
+        # Add default launch file (pkg_launch.py → includes mixed launch)
+        add_default_launch_file(pkg_name)
+
+        # Add install rules to CMakeLists.txt
+        add_install_rule_for_launch_dir_cpp(pkg_name)
+
     else:
         click.secho(f"Error: Could not determine package type for '{pkg_name}'. No setup.py or CMakeLists.txt found.", fg="red")
         sys.exit(1)
