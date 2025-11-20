@@ -9,53 +9,11 @@ endif()
 find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(rclcpp_lifecycle REQUIRED)
-find_package(rclcpp_components REQUIRED)
 find_package(std_msgs REQUIRED)
-find_package(pluginlib REQUIRED)
 
 # --- REGULAR NODES INSERTION POINT ---
 
-# --- Component library ---
-# This library is for all components in the package.
-add_library({{ package_name }}_components SHARED
-  src/register_components.cpp
-  # --- COMPONENTS INSERTION POINT ---
-)
-
-target_include_directories({{ package_name }}_components PUBLIC
-  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
-  $<INSTALL_INTERFACE:include/${PROJECT_NAME}>
-)
-
-ament_target_dependencies({{ package_name }}_components
-  rclcpp
-  rclcpp_components
-  std_msgs
-  pluginlib
-)
-
-rclcpp_components_register_nodes({{ package_name }}_components
-  # --- COMPONENTS REGISTER INSERTION POINT ---
-)
-
 # --- Installation Rules ---
-install(TARGETS 
-  {{ package_name }}_components
-  DESTINATION lib
-)
-
-# Install the plugin XML file.
-install(
-  FILES resource/{{ package_name }}_plugin.xml
-  DESTINATION share/{{ package_name }}
-)
-
-# Install the package include directory.
-install(
-  DIRECTORY include/
-  DESTINATION include
-)
-
 # Install launch files.
 install(
   DIRECTORY launch

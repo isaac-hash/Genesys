@@ -1,38 +1,35 @@
 #include "{{ package_name }}/{{ class_name }}.hpp"
 
-#include <functional>
-#include <memory>
-
-namespace {{ package_name }}
-{
+namespace {{ package_name }} {
 
 {{ class_name }}::{{ class_name }}()
-: rclcpp::Node("{{ class_name | lower }}_service_server")
-{
-    using namespace std::placeholders;
-
-    service_ = this->create_service<example_interfaces::srv::AddTwoInts>(
+: rclcpp::Node("{{ node_name }}") {
+    service_ = create_service<{{ package_name }}::srv::AddTwoInts>(
         "add_two_ints",
-        std::bind(&{{ class_name }}::add_two_ints_callback, this, _1, _2));
-    
-    RCLCPP_INFO(this->get_logger(), "{{ class_name }} service server ready.");
+        std::bind(
+            &{{ class_name }}::handle_add_two_ints,
+            this,
+            std::placeholders::_1,
+            std::placeholders::_2
+        )
+    );
+    RCLCPP_INFO(get_logger(), "AddTwoInts service ready");
 }
 
-void {{ class_name }}::add_two_ints_callback(
-    const std::shared_ptr<example_interfaces::srv::AddTwoInts::Request> request,
-    std::shared_ptr<example_interfaces::srv::AddTwoInts::Response> response)
-{
+void {{ class_name }}::handle_add_two_ints(
+    const std::shared_ptr<{{ package_name }}::srv::AddTwoInts::Request> request,
+    std::shared_ptr<{{ package_name }}::srv::AddTwoInts::Response> response
+) {
     response->sum = request->a + request->b;
-    RCLCPP_INFO(this->get_logger(), "Incoming request: a=%ld, b=%ld. Sending response: %ld",
-                request->a, request->b, response->sum);
+    RCLCPP_INFO(get_logger(), "Request received: a=%ld, b=%ld -> sum=%ld", request->a, request->b, response->sum);
 }
 
 } // namespace {{ package_name }}
 
-int main(int argc, char * argv[])
-{
+int main(int argc, char **argv) {
     rclcpp::init(argc, argv);
-    rclcpp::spin(std::make_shared<{{ package_name }}::{{ class_name }}>());
+    auto node = std::make_shared<{{ package_name }}::{{ class_name }}>();
+    rclcpp::spin(node);
     rclcpp::shutdown();
     return 0;
 }
