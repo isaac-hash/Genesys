@@ -18,8 +18,3 @@ class {{ class_name }}:
         This method is executed whenever a message is received on the '/chatter' topic.
         """
         self.get_logger().info(f"I heard: '{msg.data}'")
-def main(args=None):
-    spin_node({{ class_name }}, args)
-
-if __name__ == '__main__':
-    main()
