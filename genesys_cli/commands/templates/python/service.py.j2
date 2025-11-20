@@ -22,8 +22,4 @@ class {{ class_name }}:
         self.logger.info(f"Incoming request: a={request.a}, b={request.b}. Sending response: {response.sum}")
         {% endraw %}
         return response
-def main(args=None):
-    spin_node({{ class_name }}, args)
 
-if __name__ == '__main__':
-    main()
