@@ -12,7 +12,7 @@ class {{ class_name }}:
     def __init__(self):
         self.counter = 0
 
-    @timer(period=1.0)
+    @timer(period_sec=1.0)
     @publisher(topic="chatter", msg_type=String)
     def publisher(self):
         """
@@ -24,8 +24,4 @@ class {{ class_name }}:
         self.logger.info(f'Publishing: "{msg.data}"') # logger is auto-injected
         self.counter += 1
         return msg
-def main(args=None):
-    spin_node({{ class_name }}, args)
 
-if __name__ == '__main__':
-    main()
