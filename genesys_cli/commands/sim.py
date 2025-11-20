@@ -148,7 +148,7 @@ def create(package_name, from_pkg):
             click.secho("  Falling back to copy...", fg='yellow')
             shutil.copytree(source_urdf_path, target_urdf)
     except PackageNotFoundError:
-        click.secho(f"Warning: Package '{from_pkg}' not found or not built.", fg='yellow')
+        click.secho(f"Warning: Package '{from_pkg}' URDF not found or not built.", fg='yellow')
         click.secho("  Using template URDF file. You can link the real one later.", fg='yellow')
 
     click.secho(f"\nPackage '{package_name}' created successfully!", fg='green')
