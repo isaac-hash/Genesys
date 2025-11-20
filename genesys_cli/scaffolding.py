@@ -828,6 +828,28 @@ def add_component_to_regular_launch(pkg_name, component_name):
     click.secho(f"✓ Added '{component_name}' to regular launch file: {launch_file}", fg="green")
 
 
+
+def add_cmake_find_package(pkg_name, package_to_find):
+    """Ensures a find_package() call exists in CMakeLists.txt."""
+    cmake_path = os.path.join('src', pkg_name, "CMakeLists.txt")
+    if not os.path.exists(cmake_path): return
+
+    with open(cmake_path, 'r') as f:
+        content = f.read()
+    
+    if f"find_package({package_to_find}" in content:
+        return
+
+    # Insert after the mandatory ament_cmake find_package
+    if "find_package(ament_cmake REQUIRED)" in content:
+        content = content.replace(
+            "find_package(ament_cmake REQUIRED)", 
+            f"find_package(ament_cmake REQUIRED)\nfind_package({package_to_find} REQUIRED)"
+        )
+        with open(cmake_path, 'w') as f:
+            f.write(content)
+        click.secho(f"✓ Added find_package({package_to_find}) to CMakeLists.txt", fg="green")
+
 def make_cpp_component(pkg_name, component_name, component_type):
     """Creates a new C++ component and correctly registers it, adding component-specific
     build infrastructure to CMakeLists.txt."""
@@ -1010,26 +1032,8 @@ install(
             content = content.replace("</export>", f'  <rclcpp_components plugin="resource/{pkg_name}_plugin.xml"/>\n</export>')
         f.seek(0); f.write(content); f.truncate()
     click.secho(f"✓ Updated package.xml for components", fg="green")
-def add_cmake_find_package(pkg_name, package_to_find):
-    """Ensures a find_package() call exists in CMakeLists.txt."""
-    cmake_path = os.path.join('src', pkg_name, "CMakeLists.txt")
-    if not os.path.exists(cmake_path): return
 
-    with open(cmake_path, 'r') as f:
-        content = f.read()
-    
-    if f"find_package({package_to_find}" in content:
-        return
 
-    # Insert after the mandatory ament_cmake find_package
-    if "find_package(ament_cmake REQUIRED)" in content:
-        content = content.replace(
-            "find_package(ament_cmake REQUIRED)", 
-            f"find_package(ament_cmake REQUIRED)\nfind_package({package_to_find} REQUIRED)"
-        )
-        with open(cmake_path, 'w') as f:
-            f.write(content)
-        click.secho(f"✓ Added find_package({package_to_find}) to CMakeLists.txt", fg="green")
 
 def make_cpp_node(pkg_name, node_name, node_type):
     """Creates a new C++ node and registers it in the package."""
