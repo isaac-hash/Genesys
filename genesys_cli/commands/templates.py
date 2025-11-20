@@ -96,10 +96,10 @@ def get_cpp_component_templates(component_type, pkg_name, class_name, node_name,
         "description": description
     }
 
-    hpp_content = hpp_template.render(package_name=pkg_name, class_name=class_name, description=description)
-    cpp_content = cpp_template.render(package_name=pkg_name, class_name=class_name, description=description)
-    register_content = register_template.render(package_name=pkg_name, class_name=class_name)
-    plugin_content = plugin_template.render(package_name=pkg_name, class_name=class_name, description=description)
+    hpp_content = hpp_template.render(**context)
+    cpp_content = cpp_template.render(**context)
+    register_content = register_template.render(**context)
+    plugin_content = plugin_template.render(**context)
     
     return hpp_content, cpp_content, register_content, plugin_content
 
