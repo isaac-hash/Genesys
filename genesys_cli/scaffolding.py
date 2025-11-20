@@ -239,6 +239,73 @@ def add_install_rule_for_launch_dir(pkg_name):
     
     click.secho(f"✓ Added launch directory install rule to {setup_file}", fg="green")
 
+def add_action_definition(pkg_name):
+    """Creates a local Fibonacci.action and updates CMake/package.xml to generate interfaces."""
+    pkg_path = os.path.join('src', pkg_name)
+    
+    # 1. Create the .action file
+    action_dir = os.path.join(pkg_path, 'action')
+    os.makedirs(action_dir, exist_ok=True)
+    action_file = "Fibonacci.action"
+    action_file_path = os.path.join(action_dir, action_file)
+    
+    if not os.path.exists(action_file_path):
+        with open(action_file_path, 'w') as f:
+            f.write("int32 order\n---\nint32[] sequence\n---\nint32[] partial_sequence\n")
+        click.secho(f"✓ Created action definition: {action_file_path}", fg="green")
+
+    # 2. Update package.xml (Re-using logic from add_service_definition is cleaner, but we repeat for safety)
+    package_xml_path = os.path.join(pkg_path, 'package.xml')
+    with open(package_xml_path, 'r') as f: content = f.read()
+    
+    tags_to_add = []
+    if "rosidl_default_generators" not in content:
+        tags_to_add.append("  <build_depend>rosidl_default_generators</build_depend>")
+    if "rosidl_default_runtime" not in content:
+        tags_to_add.append("  <exec_depend>rosidl_default_runtime</exec_depend>")
+    if "rosidl_interface_packages" not in content:
+        tags_to_add.append("  <member_of_group>rosidl_interface_packages</member_of_group>")
+
+    if tags_to_add and "</package>" in content:
+        insertion = "\n" + "\n".join(tags_to_add) + "\n"
+        content = content.replace("</package>", insertion + "</package>")
+        with open(package_xml_path, 'w') as f: f.write(content)
+        click.secho(f"✓ Updated {package_xml_path} for action generation.", fg="green")
+
+    # 3. Update CMakeLists.txt safely
+    cmake_path = os.path.join(pkg_path, "CMakeLists.txt")
+    with open(cmake_path, 'r') as f: content = f.read()
+
+    # Add generators dependency if missing
+    if "rosidl_default_generators" not in content:
+        content = content.replace(
+            "find_package(ament_cmake REQUIRED)", 
+            "find_package(ament_cmake REQUIRED)\nfind_package(rosidl_default_generators REQUIRED)"
+        )
+
+    # Handle rosidl_generate_interfaces
+    action_entry = f'"action/{action_file}"'
+    if "rosidl_generate_interfaces" in content:
+        # Block exists (e.g. from Service), append action if not present
+        if action_file not in content:
+            # Insert specifically after the opening parenthesis + PROJECT_NAME
+            # This is a safe heuristic to prepend to the list of files
+            pattern = f"rosidl_generate_interfaces(${{PROJECT_NAME}}"
+            replacement = f"{pattern}\n  {action_entry}"
+            content = content.replace(pattern, replacement)
+    else:
+        # Block missing, create it
+        rosidl_block = f'''
+rosidl_generate_interfaces(${{PROJECT_NAME}}
+  {action_entry}
+)
+'''
+        if "ament_package()" in content:
+            content = content.replace("ament_package()", f"{rosidl_block}\nament_package()")
+    
+    with open(cmake_path, 'w') as f: f.write(content)
+    click.secho(f"✓ Updated {cmake_path} for action generation.", fg="green")
+
 def add_cpp_executable(pkg_name, node_name, dependencies=None):
     """Adds a new executable to CMakeLists.txt with dynamic dependencies and modern CMake targets."""
     cmake_file = os.path.join('src', pkg_name, 'CMakeLists.txt')
@@ -978,12 +1045,35 @@ def make_cpp_node(pkg_name, node_name, node_type):
 
     # 4. Define Dependencies based on Node Type
     dependencies = ["rclcpp", "std_msgs", "rclcpp_lifecycle"]
+    
     if node_type == 'ActionServer' or node_type == 'ActionClient':
         dependencies.append("rclcpp_action")
         add_cmake_find_package(pkg_name, "rclcpp_action")
+        
+        # A. Generate local action definition
+        add_action_definition(pkg_name)
+        
+        # B. Patch the generated C++ files to use the local action instead of tutorial interfaces
+        # This fixes the 'fatal error: action_tutorials_interfaces/action/fibonacci.hpp: No such file'
+        for file_path in [hpp_file_path, cpp_file_path]:
+            with open(file_path, 'r') as f: content = f.read()
+            
+            # Replace header include
+            content = content.replace(
+                "action_tutorials_interfaces/action/fibonacci.hpp", 
+                f"{pkg_name}/action/fibonacci.hpp"
+            )
+            # Replace namespace
+            content = content.replace(
+                "action_tutorials_interfaces::action::Fibonacci", 
+                f"{pkg_name}::action::Fibonacci"
+            )
+            
+            with open(file_path, 'w') as f: f.write(content)
+        click.secho(f"✓ Patched C++ files to use local '{pkg_name}::action::Fibonacci'", fg="green")
 
     # 5. Update CMakeLists.txt (Executable + Dependencies)
     add_cpp_executable(pkg_name, node_name, dependencies=dependencies)
 
     # 6. Update package.xml
-    add_cpp_dependencies_to_package_xml(pkg_name, dependencies)
+    add_cpp_dependencies_to_package_xml(pkg_name, dependencies)    
