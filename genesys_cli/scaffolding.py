@@ -256,7 +256,8 @@ def add_action_definition(pkg_name):
 
     # 2. Update package.xml
     package_xml_path = os.path.join(pkg_path, 'package.xml')
-    with open(package_xml_path, 'r') as f: content = f.read()
+    with open(package_xml_path, 'r') as f:
+        content = f.read()
     
     tags_to_add = []
     if "rosidl_default_generators" not in content:
@@ -269,12 +270,14 @@ def add_action_definition(pkg_name):
     if tags_to_add and "</package>" in content:
         insertion = "\n" + "\n".join(tags_to_add) + "\n"
         content = content.replace("</package>", insertion + "</package>")
-        with open(package_xml_path, 'w') as f: f.write(content)
+        with open(package_xml_path, 'w') as f:
+            f.write(content)
         click.secho(f"✓ Updated {package_xml_path} for action generation.", fg="green")
 
     # 3. Update CMakeLists.txt safely
     cmake_path = os.path.join(pkg_path, "CMakeLists.txt")
-    with open(cmake_path, 'r') as f: content = f.read()
+    with open(cmake_path, 'r') as f:
+        content = f.read()
 
     # Add generators dependency if missing
     if "rosidl_default_generators" not in content:
@@ -298,19 +301,28 @@ rosidl_generate_interfaces(${{PROJECT_NAME}}
   {action_entry}
 )
 '''
-        # FIX: Insert BEFORE the node definitions so targets exist when nodes are added
+        # Insert BEFORE nodes
         if "# --- REGULAR NODES INSERTION POINT ---" in content:
             content = content.replace(
                 "# --- REGULAR NODES INSERTION POINT ---", 
                 f"{rosidl_block}\n# --- REGULAR NODES INSERTION POINT ---"
             )
         elif "ament_package()" in content:
-             # Fallback
-             content = content.replace("ament_package()", f"{rosidl_block}\nament_package()")
-    
-    with open(cmake_path, 'w') as f: f.write(content)
-    click.secho(f"✓ Updated {cmake_path} for action generation.", fg="green")
+            content = content.replace("ament_package()", f"{rosidl_block}\nament_package()")
 
+    # 4. Add missing export dependency (IMPORTANT to avoid plugin namespace collision)
+    export_line = "ament_export_dependencies(rosidl_default_runtime)"
+    if export_line not in content:
+        content = content.replace(
+            "ament_package()",
+            f"{export_line}\nament_package()"
+        )
+
+    # Save file
+    with open(cmake_path, 'w') as f:
+        f.write(content)
+
+    click.secho(f"✓ Updated {cmake_path} for action generation.", fg="green")
 
 def add_cpp_executable(pkg_name, node_name, dependencies=None):
     """Adds a new executable to CMakeLists.txt with dynamic dependencies."""
@@ -963,48 +975,47 @@ endif()
         )
         content = content.replace(find_package_marker, f"{find_package_marker}{additional_find_packages}")
 
-        component_block = f'''
-# --- Component library ---
-# This library is for all components in the package.
-add_library({pkg_name}_components SHARED
-  src/register_components.cpp
-  {component_src_file}
-  # --- COMPONENTS INSERTION POINT ---
-)
+        deps_joined = "\n  ".join(component_deps)
+        component_block = f"""
+            # --- Component library ---
+            # This library is for all components in the package.
+            add_library({pkg_name}_components SHARED
+            src/register_components.cpp
+            {component_src_file}
+            # --- COMPONENTS INSERTION POINT ---
+            )
 
-target_include_directories({pkg_name}_components PUBLIC
-  $<BUILD_INTERFACE:${{CMAKE_CURRENT_SOURCE_DIR}}/include>
-  $<INSTALL_INTERFACE:include/${{PROJECT_NAME}}>)
+            target_include_directories({pkg_name}_components PUBLIC
+            $<BUILD_INTERFACE:${{CMAKE_CURRENT_SOURCE_DIR}}/include>
+            $<INSTALL_INTERFACE:include/${{PROJECT_NAME}}>
+            )
 
-ament_target_dependencies({pkg_name}_components
-  {"\n  ".join(component_deps)}
-)
+            ament_target_dependencies({pkg_name}_components
+            {deps_joined}
+            )
 
-{link_interfaces_block}
+            {link_interfaces_block}
 
-rclcpp_components_register_nodes({pkg_name}_components
-  "{pkg_name}::{class_name}"
-  # --- COMPONENTS REGISTER INSERTION POINT ---
-)
+            rclcpp_components_register_nodes({pkg_name}_components
+            "{pkg_name}::{class_name}"
+            # --- COMPONENTS REGISTER INSERTION POINT ---
+            )
 
-# Add component library to install rules
-install(TARGETS 
-  {pkg_name}_components
-  DESTINATION lib
-)
+            install(TARGETS 
+            {pkg_name}_components
+            DESTINATION lib
+            )
 
-# Install the plugin XML file.
-install(
-  FILES resource/{pkg_name}_plugin.xml
-  DESTINATION share/{pkg_name}
-)
+            install(
+            FILES resource/{pkg_name}_plugin.xml
+            DESTINATION share/{pkg_name}
+            )
 
-# Install the package include directory.
-install(
-  DIRECTORY include/
-  DESTINATION include
-)
-'''
+            install(
+            DIRECTORY include/
+            DESTINATION include
+            )
+            """
         content = content.replace(ament_package_marker, f"{component_block}\n{ament_package_marker}")
         click.secho(f"✓ Added component build infrastructure to {cmake_path}", fg="green")
 
@@ -1079,6 +1090,8 @@ install(
             content = content.replace("</export>", f'  <rclcpp_components plugin="resource/{pkg_name}_plugin.xml"/>\n</export>')
         f.seek(0); f.write(content); f.truncate()
     click.secho(f"✓ Updated package.xml for components", fg="green")
+
+
 
 def make_cpp_node(pkg_name, node_name, node_type):
     """Creates a new C++ node and registers it in the package."""
