@@ -256,6 +256,9 @@ def add_cpp_executable(pkg_name, node_name):
 
     # --- Build the new executable block ---
     node_src_file = f"src/{node_name}.cpp"
+    
+    # FIX 1: Removed ${{PROJECT_NAME}} from ament_target_dependencies to prevent 'package not found' error
+    # FIX 2: Added conditional rosidl_target_interfaces to link generated services/messages
     new_block = f'''
 # --- Node: {node_name} ---
 add_executable({node_name} {node_src_file})
@@ -269,8 +272,12 @@ ament_target_dependencies({node_name}
   rclcpp
   rclcpp_lifecycle
   std_msgs
-  ${{PROJECT_NAME}}
 )
+
+# Link against generated interfaces (messages/services) if they exist in this package
+if(TARGET ${{PROJECT_NAME}}__rosidl_typesupport_cpp)
+  rosidl_target_interfaces({node_name} ${{PROJECT_NAME}} "rosidl_typesupport_cpp")
+endif()
 
 install(TARGETS
   {node_name}
@@ -287,8 +294,6 @@ install(TARGETS
         click.secho(f"✓ Registered executable '{node_name}' in {cmake_file}", fg="green")
     else:
         click.secho(f"Error: Could not find insertion marker in {cmake_file}. Node not added.", fg="red")
-
-
 
 def add_install_rule_for_launch_dir_cpp(pkg_name):
     """Adds the install rule for the launch directory to CMakeLists.txt."""
