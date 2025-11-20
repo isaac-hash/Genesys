@@ -561,19 +561,40 @@ def add_service_definition(pkg_name):
 
     # 2. Update package.xml
     package_xml_path = os.path.join(pkg_path, 'package.xml')
-    with open(package_xml_path, 'r+') as f:
+    with open(package_xml_path, 'r') as f:
         content = f.read()
-        if "rosidl_default_generators" not in content:
-            content = content.replace("</export>", "  <build_depend>rosidl_default_generators</build_depend>\n  <exec_depend>rosidl_default_runtime</exec_depend>\n  <member_of_group>rosidl_interface_packages</member_of_group>\n</export>")
-        f.seek(0); f.write(content); f.truncate()
-    click.secho(f"✓ Updated {package_xml_path} for service generation.", fg="green")
+    
+    # Check individually for missing tags and prepare them
+    tags_to_add = []
+    if "rosidl_default_generators" not in content:
+        tags_to_add.append("  <build_depend>rosidl_default_generators</build_depend>")
+    if "rosidl_default_runtime" not in content:
+        tags_to_add.append("  <exec_depend>rosidl_default_runtime</exec_depend>")
+    if "rosidl_interface_packages" not in content:
+        tags_to_add.append("  <member_of_group>rosidl_interface_packages</member_of_group>")
+
+    # Insert tags before </package> to ensure they are at the root level, not inside <export>
+    if tags_to_add:
+        if "</package>" in content:
+            insertion = "\n" + "\n".join(tags_to_add) + "\n"
+            content = content.replace("</package>", insertion + "</package>")
+            
+            with open(package_xml_path, 'w') as f:
+                f.write(content)
+            click.secho(f"✓ Updated {package_xml_path} for service generation.", fg="green")
+        else:
+            click.secho(f"Error: Could not find </package> tag in {package_xml_path}", fg="red")
 
     # 3. Update CMakeLists.txt
     cmake_path = os.path.join(pkg_path, "CMakeLists.txt")
     with open(cmake_path, 'r+') as f:
         content = f.read()
         if "rosidl_default_generators" not in content:
-            content = content.replace("find_package(ament_cmake REQUIRED)", "find_package(ament_cmake REQUIRED)\nfind_package(rosidl_default_generators REQUIRED)")
+            # Add dependency package finding
+            content = content.replace(
+                "find_package(ament_cmake REQUIRED)", 
+                "find_package(ament_cmake REQUIRED)\nfind_package(rosidl_default_generators REQUIRED)"
+            )
         
         if "rosidl_generate_interfaces" not in content:
             rosidl_block = f'''
@@ -581,12 +602,23 @@ rosidl_generate_interfaces(${{PROJECT_NAME}}
   "srv/AddTwoInts.srv"
 )
 '''
-            content = content.replace("# --- REGULAR NODES INSERTION POINT ---", f"{rosidl_block}\n# --- REGULAR NODES INSERTION POINT ---")
+            # Ensure this block is placed BEFORE ament_package() but AFTER dependencies
+            # We use the node insertion point as a safe anchor if available
+            if "# --- REGULAR NODES INSERTION POINT ---" in content:
+                content = content.replace(
+                    "# --- REGULAR NODES INSERTION POINT ---", 
+                    f"{rosidl_block}\n# --- REGULAR NODES INSERTION POINT ---"
+                )
+            else:
+                # Fallback: Insert before ament_package if marker is missing
+                content = content.replace(
+                    "ament_package()", 
+                    f"{rosidl_block}\nament_package()"
+                )
         
         f.seek(0); f.write(content); f.truncate()
     click.secho(f"✓ Updated {cmake_path} for service generation.", fg="green")
-
-
+    
 def add_component_to_regular_launch(pkg_name, component_name):
     """
     Adds a new ComposableNode entry into the package's regular launch file (pkg_name_launch.py).
