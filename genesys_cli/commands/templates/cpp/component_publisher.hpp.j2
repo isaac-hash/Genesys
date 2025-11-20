@@ -4,12 +4,11 @@
 #include "std_msgs/msg/string.hpp"
 
 namespace {{ package_name }}
-{
 
 class {{ class_name }} : public rclcpp::Node
 {
 public:
-    {{ class_name }}();
+    explicit {{ class_name }}(const rclcpp::NodeOptions & options);
 
 private:
     void on_timer();

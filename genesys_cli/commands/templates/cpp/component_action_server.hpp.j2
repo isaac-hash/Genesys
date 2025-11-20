@@ -13,7 +13,7 @@ public:
     using Fibonacci = action_tutorials_interfaces::action::Fibonacci;
     using GoalHandleFibonacci = rclcpp_action::ServerGoalHandle<Fibonacci>;
 
-    {{ class_name }}();
+    explicit {{ class_name }}(const rclcpp::NodeOptions & options);
 
 private:
     rclcpp_action::Server<Fibonacci>::SharedPtr action_server_;
