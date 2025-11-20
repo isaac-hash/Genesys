@@ -830,7 +830,7 @@ def add_component_to_regular_launch(pkg_name, component_name):
 
 def make_cpp_component(pkg_name, component_name, component_type):
     """Creates a new C++ component and correctly registers it, adding component-specific
-    build infrastructure to CMakeLists.txt only if it doesn't already exist."""
+    build infrastructure to CMakeLists.txt."""
     
     class_name = "".join(word.capitalize() for word in component_name.split('_'))
     pkg_path = os.path.join('src', pkg_name)
@@ -885,12 +885,21 @@ def make_cpp_component(pkg_name, component_name, component_type):
 
     component_marker = "# --- Component library ---"
     component_src_file = f"src/{class_name}.cpp"
+    
+    # Logic to link the component library against generated interfaces (srv/msg/action)
+    # This is required so the component can find headers like "cpp_pkg/srv/add_two_ints.hpp"
+    link_interfaces_block = f'''
+# Link against generated interfaces (messages/services)
+rosidl_get_typesupport_target(ts_target "${{PROJECT_NAME}}" "rosidl_typesupport_cpp")
+if(TARGET "${{ts_target}}")
+  target_link_libraries({pkg_name}_components "${{ts_target}}")
+endif()
+'''
 
     if component_marker not in content:
         # --- First component: add the entire component infrastructure ---
         ament_package_marker = "# --- Must be last ---"
         
-        # Add find_package calls for component-specific dependencies
         find_package_marker = "# --- Find dependencies ---"
         additional_find_packages = (
             '\nfind_package(rclcpp_components REQUIRED)\n'
@@ -898,7 +907,6 @@ def make_cpp_component(pkg_name, component_name, component_type):
         )
         content = content.replace(find_package_marker, f"{find_package_marker}{additional_find_packages}")
 
-        # Build the main component block
         component_block = f'''
 # --- Component library ---
 # This library is for all components in the package.
@@ -918,6 +926,8 @@ ament_target_dependencies({pkg_name}_components
   std_msgs
   pluginlib
 )
+
+{link_interfaces_block}
 
 rclcpp_components_register_nodes({pkg_name}_components
   "{pkg_name}::{class_name}"
@@ -947,6 +957,14 @@ install(
 
     else:
         # --- Subsequent component: just add to existing infrastructure ---
+        
+        # FIX: Check if the interface linking is missing (repair existing files)
+        if "rosidl_get_typesupport_target" not in content and f"{pkg_name}_components" in content:
+            register_marker = f"rclcpp_components_register_nodes({pkg_name}_components"
+            if register_marker in content:
+                content = content.replace(register_marker, f"{link_interfaces_block}\n{register_marker}")
+                click.secho(f"✓ Patched {cmake_path} to link interfaces.", fg="green")
+
         if component_src_file not in content:
             src_marker = "# --- COMPONENTS INSERTION POINT ---"
             content = content.replace(src_marker, f"{src_marker}\n  {component_src_file}")
@@ -992,7 +1010,6 @@ install(
             content = content.replace("</export>", f'  <rclcpp_components plugin="resource/{pkg_name}_plugin.xml"/>\n</export>')
         f.seek(0); f.write(content); f.truncate()
     click.secho(f"✓ Updated package.xml for components", fg="green")
-
 def add_cmake_find_package(pkg_name, package_to_find):
     """Ensures a find_package() call exists in CMakeLists.txt."""
     cmake_path = os.path.join('src', pkg_name, "CMakeLists.txt")
