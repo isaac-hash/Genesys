@@ -1082,6 +1082,8 @@ install(
         f.seek(0); f.write(content); f.truncate()
     click.secho(f"✓ Updated package.xml for components", fg="green")
 
+
+
 def make_cpp_node(pkg_name, node_name, node_type):
     """Creates a new C++ node and registers it in the package."""
     
