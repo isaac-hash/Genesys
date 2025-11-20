@@ -239,8 +239,8 @@ def add_install_rule_for_launch_dir(pkg_name):
     
     click.secho(f"✓ Added launch directory install rule to {setup_file}", fg="green")
 
-def add_cpp_executable(pkg_name, node_name):
-    """Adds a new executable and install rule to a package's CMakeLists.txt safely using a marker."""
+def add_cpp_executable(pkg_name, node_name, dependencies=None):
+    """Adds a new executable to CMakeLists.txt with dynamic dependencies and modern CMake targets."""
     cmake_file = os.path.join('src', pkg_name, 'CMakeLists.txt')
     if not os.path.exists(cmake_file):
         click.secho(f"Error: {cmake_file} not found.", fg="red")
@@ -254,11 +254,16 @@ def add_cpp_executable(pkg_name, node_name):
         click.secho(f"Node '{node_name}' already registered in {cmake_file}.", fg="yellow")
         return
 
-    # --- Build the new executable block ---
+    # Default dependencies if none provided
+    if dependencies is None:
+        dependencies = ["rclcpp", "rclcpp_lifecycle", "std_msgs"]
+    
+    # Format dependencies for CMake (indentation)
+    deps_str = "\n  ".join(dependencies)
+
     node_src_file = f"src/{node_name}.cpp"
     
-    # FIX 1: Removed ${{PROJECT_NAME}} from ament_target_dependencies to prevent 'package not found' error
-    # FIX 2: Added conditional rosidl_target_interfaces to link generated services/messages
+    # FIX: Dynamic dependencies + Modern rosidl_get_typesupport_target (fixes deprecation warning)
     new_block = f'''
 # --- Node: {node_name} ---
 add_executable({node_name} {node_src_file})
@@ -269,14 +274,13 @@ target_include_directories({node_name} PUBLIC
 )
 
 ament_target_dependencies({node_name}
-  rclcpp
-  rclcpp_lifecycle
-  std_msgs
+  {deps_str}
 )
 
-# Link against generated interfaces (messages/services) if they exist in this package
+# Link against generated interfaces (messages/services) if they exist
 if(TARGET ${{PROJECT_NAME}}__rosidl_typesupport_cpp)
-  rosidl_target_interfaces({node_name} ${{PROJECT_NAME}} "rosidl_typesupport_cpp")
+  rosidl_get_typesupport_target(ts_target "${{PROJECT_NAME}}" "rosidl_typesupport_cpp")
+  target_link_libraries({node_name} "${{ts_target}}")
 endif()
 
 install(TARGETS
@@ -294,6 +298,7 @@ install(TARGETS
         click.secho(f"✓ Registered executable '{node_name}' in {cmake_file}", fg="green")
     else:
         click.secho(f"Error: Could not find insertion marker in {cmake_file}. Node not added.", fg="red")
+
 
 def add_install_rule_for_launch_dir_cpp(pkg_name):
     """Adds the install rule for the launch directory to CMakeLists.txt."""
@@ -920,6 +925,27 @@ install(
         f.seek(0); f.write(content); f.truncate()
     click.secho(f"✓ Updated package.xml for components", fg="green")
 
+def add_cmake_find_package(pkg_name, package_to_find):
+    """Ensures a find_package() call exists in CMakeLists.txt."""
+    cmake_path = os.path.join('src', pkg_name, "CMakeLists.txt")
+    if not os.path.exists(cmake_path): return
+
+    with open(cmake_path, 'r') as f:
+        content = f.read()
+    
+    if f"find_package({package_to_find}" in content:
+        return
+
+    # Insert after the mandatory ament_cmake find_package
+    if "find_package(ament_cmake REQUIRED)" in content:
+        content = content.replace(
+            "find_package(ament_cmake REQUIRED)", 
+            f"find_package(ament_cmake REQUIRED)\nfind_package({package_to_find} REQUIRED)"
+        )
+        with open(cmake_path, 'w') as f:
+            f.write(content)
+        click.secho(f"✓ Added find_package({package_to_find}) to CMakeLists.txt", fg="green")
+
 def make_cpp_node(pkg_name, node_name, node_type):
     """Creates a new C++ node and registers it in the package."""
     
@@ -941,19 +967,23 @@ def make_cpp_node(pkg_name, node_name, node_type):
     hpp_file_path = os.path.join(include_dir, f"{class_name}.hpp")
     cpp_file_path = os.path.join(src_dir, f"{node_name}.cpp")
 
-    with open(hpp_file_path, 'w') as f:
-        f.write(hpp_content)
+    with open(hpp_file_path, 'w') as f: f.write(hpp_content)
     click.secho(f"✓ Created C++ node header: {hpp_file_path}", fg="green")
 
-    with open(cpp_file_path, 'w') as f:
-        f.write(cpp_content)
+    with open(cpp_file_path, 'w') as f: f.write(cpp_content)
     click.secho(f"✓ Created C++ node source: {cpp_file_path}", fg="green")
 
     if node_type == 'Service':
         add_service_definition(pkg_name)
 
-    # 4. Update CMakeLists.txt to add the executable
-    add_cpp_executable(pkg_name, node_name)
+    # 4. Define Dependencies based on Node Type
+    dependencies = ["rclcpp", "std_msgs", "rclcpp_lifecycle"]
+    if node_type == 'ActionServer' or node_type == 'ActionClient':
+        dependencies.append("rclcpp_action")
+        add_cmake_find_package(pkg_name, "rclcpp_action")
 
-    # 5. Update package.xml with dependencies
-    add_cpp_dependencies_to_package_xml(pkg_name, ["rclcpp", "std_msgs"])
+    # 5. Update CMakeLists.txt (Executable + Dependencies)
+    add_cpp_executable(pkg_name, node_name, dependencies=dependencies)
+
+    # 6. Update package.xml
+    add_cpp_dependencies_to_package_xml(pkg_name, dependencies)
