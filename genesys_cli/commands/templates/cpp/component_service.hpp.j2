@@ -1,22 +1,19 @@
 #pragma once
 
 #include "rclcpp/rclcpp.hpp"
-#include "example_interfaces/srv/add_two_ints.hpp"
+#include "{{ package_name }}/srv/add_two_ints.hpp"
 
-namespace {{ package_name }}
-{
+namespace {{ package_name }} {
 
-class {{ class_name }} : public rclcpp::Node
-{
+class {{ class_name }} : public rclcpp::Node {
 public:
     explicit {{ class_name }}(const rclcpp::NodeOptions & options);
-
 private:
-    rclcpp::Service<example_interfaces::srv::AddTwoInts>::SharedPtr service_;
-
-    void add_two_ints_callback(
-        const std::shared_ptr<example_interfaces::srv::AddTwoInts::Request> request,
-        std::shared_ptr<example_interfaces::srv::AddTwoInts::Response> response);
+    rclcpp::Service<{{ package_name }}::srv::AddTwoInts>::SharedPtr service_;
+    void handle_add_two_ints(
+        const std::shared_ptr<{{ package_name }}::srv::AddTwoInts::Request> request,
+        std::shared_ptr<{{ package_name }}::srv::AddTwoInts::Response> response
+    );
 };
 
 } // namespace {{ package_name }}
