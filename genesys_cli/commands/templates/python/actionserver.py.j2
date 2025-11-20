@@ -29,7 +29,10 @@ class {{ class_name }}:
 
             sequence.append(sequence[i] + sequence[i-1])
             feedback_msg.partial_sequence = sequence
-            self.logger.info(f'Feedback: {{feedback_msg.partial_sequence}}')
+            {% raw %}
+            self.logger.info(f'Feedback: {feedback_msg.partial_sequence}')
+            {% endraw %}
+
             goal_handle.publish_feedback(feedback_msg)
             await asyncio.sleep(1)
 
@@ -42,9 +45,3 @@ class {{ class_name }}:
         {% endraw %}
 
         return result
-
-def main(args=None):
-    spin_node({{ class_name }}, args)
-
-if __name__ == '__main__':
-    main()
