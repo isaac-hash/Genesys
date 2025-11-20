@@ -13,16 +13,19 @@ class {{ class_name }}:
         self.counter = 0
 
     @timer(period=1.0)
-    def timer_callback(self):
-        """
-        This method is executed every 1.0 seconds.
-        """
-        self.counter += 1
-        self.publisher.publish(String(data=f"Hello, world! {self.counter}"))
-
-    @publisher(topic="~/chatter", msg_type=String)
+    @publisher(topic="chatter", msg_type=String)
     def publisher(self):
         """
         This method is decorated as a publisher on the '~/chatter' topic.
         """
         pass
+        msg = String()
+        msg.data = f"Hello from Genesys! Message #{self.counter}"
+        self.logger.info(f'Publishing: "{msg.data}"') # logger is auto-injected
+        self.counter += 1
+        return msg
+def main(args=None):
+    spin_node({{ class_name }}, args)
+
+if __name__ == '__main__':
+    main()

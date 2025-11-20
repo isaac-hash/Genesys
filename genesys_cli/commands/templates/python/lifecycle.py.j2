@@ -31,3 +31,9 @@ class {{ class_name }}:
     def on_shutdown(self, state: State) -> TransitionCallbackReturn:
         self.get_logger().info("on_shutdown() is called.")
         return TransitionCallbackReturn.SUCCESS
+
+def main(args=None):
+    spin_node({{ class_name }}, args)
+
+if __name__ == '__main__':
+    main()
