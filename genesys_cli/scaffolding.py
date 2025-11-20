@@ -254,7 +254,7 @@ def add_action_definition(pkg_name):
             f.write("int32 order\n---\nint32[] sequence\n---\nint32[] partial_sequence\n")
         click.secho(f"✓ Created action definition: {action_file_path}", fg="green")
 
-    # 2. Update package.xml (Re-using logic from add_service_definition is cleaner, but we repeat for safety)
+    # 2. Update package.xml
     package_xml_path = os.path.join(pkg_path, 'package.xml')
     with open(package_xml_path, 'r') as f: content = f.read()
     
@@ -286,10 +286,8 @@ def add_action_definition(pkg_name):
     # Handle rosidl_generate_interfaces
     action_entry = f'"action/{action_file}"'
     if "rosidl_generate_interfaces" in content:
-        # Block exists (e.g. from Service), append action if not present
+        # Block exists, append action if not present
         if action_file not in content:
-            # Insert specifically after the opening parenthesis + PROJECT_NAME
-            # This is a safe heuristic to prepend to the list of files
             pattern = f"rosidl_generate_interfaces(${{PROJECT_NAME}}"
             replacement = f"{pattern}\n  {action_entry}"
             content = content.replace(pattern, replacement)
@@ -300,37 +298,39 @@ rosidl_generate_interfaces(${{PROJECT_NAME}}
   {action_entry}
 )
 '''
-        if "ament_package()" in content:
-            content = content.replace("ament_package()", f"{rosidl_block}\nament_package()")
+        # FIX: Insert BEFORE the node definitions so targets exist when nodes are added
+        if "# --- REGULAR NODES INSERTION POINT ---" in content:
+            content = content.replace(
+                "# --- REGULAR NODES INSERTION POINT ---", 
+                f"{rosidl_block}\n# --- REGULAR NODES INSERTION POINT ---"
+            )
+        elif "ament_package()" in content:
+             # Fallback
+             content = content.replace("ament_package()", f"{rosidl_block}\nament_package()")
     
     with open(cmake_path, 'w') as f: f.write(content)
     click.secho(f"✓ Updated {cmake_path} for action generation.", fg="green")
 
 def add_cpp_executable(pkg_name, node_name, dependencies=None):
-    """Adds a new executable to CMakeLists.txt with dynamic dependencies and modern CMake targets."""
+    """Adds a new executable to CMakeLists.txt with dynamic dependencies."""
     cmake_file = os.path.join('src', pkg_name, 'CMakeLists.txt')
     if not os.path.exists(cmake_file):
         click.secho(f"Error: {cmake_file} not found.", fg="red")
         return
 
-    with open(cmake_file, 'r') as f:
-        content = f.read()
+    with open(cmake_file, 'r') as f: content = f.read()
 
-    # --- Idempotency Check ---
     if f"add_executable({node_name} " in content:
-        click.secho(f"Node '{node_name}' already registered in {cmake_file}.", fg="yellow")
+        click.secho(f"Node '{node_name}' already registered.", fg="yellow")
         return
 
-    # Default dependencies if none provided
-    if dependencies is None:
-        dependencies = ["rclcpp", "rclcpp_lifecycle", "std_msgs"]
-    
-    # Format dependencies for CMake (indentation)
+    if dependencies is None: dependencies = ["rclcpp", "rclcpp_lifecycle", "std_msgs"]
     deps_str = "\n  ".join(dependencies)
-
     node_src_file = f"src/{node_name}.cpp"
-    
-    # FIX: Dynamic dependencies + Modern rosidl_get_typesupport_target (fixes deprecation warning)
+
+    # FIX: Removed 'if(TARGET...)' wrapper. 
+    # If rosidl_generate_interfaces is called, we MUST link it. 
+    # We rely on CMake's lazy target resolution or correct ordering from add_action_definition.
     new_block = f'''
 # --- Node: {node_name} ---
 add_executable({node_name} {node_src_file})
@@ -344,9 +344,9 @@ ament_target_dependencies({node_name}
   {deps_str}
 )
 
-# Link against generated interfaces (messages/services) if they exist
-if(TARGET ${{PROJECT_NAME}}__rosidl_typesupport_cpp)
-  rosidl_get_typesupport_target(ts_target "${{PROJECT_NAME}}" "rosidl_typesupport_cpp")
+# Link against generated interfaces using modern CMake targets
+rosidl_get_typesupport_target(ts_target "${{PROJECT_NAME}}" "rosidl_typesupport_cpp")
+if(TARGET "${{ts_target}}")
   target_link_libraries({node_name} "${{ts_target}}")
 endif()
 
@@ -356,17 +356,13 @@ install(TARGETS
 )
 '''
 
-    # --- Insert at the marker ---
     marker = "# --- REGULAR NODES INSERTION POINT ---"
     if marker in content:
         content = content.replace(marker, f"{marker}\n{new_block}")
-        with open(cmake_file, 'w') as f:
-            f.write(content)
+        with open(cmake_file, 'w') as f: f.write(content)
         click.secho(f"✓ Registered executable '{node_name}' in {cmake_file}", fg="green")
     else:
-        click.secho(f"Error: Could not find insertion marker in {cmake_file}. Node not added.", fg="red")
-
-
+        click.secho(f"Error: Insertion marker not found in {cmake_file}.", fg="red")
 def add_install_rule_for_launch_dir_cpp(pkg_name):
     """Adds the install rule for the launch directory to CMakeLists.txt."""
     cmake_file = os.path.join('src', pkg_name, 'CMakeLists.txt')
