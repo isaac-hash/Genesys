@@ -242,73 +242,79 @@ def add_install_rule_for_launch_dir(pkg_name):
 def add_action_definition(pkg_name):
     """Creates a local Fibonacci.action and updates CMake/package.xml to generate interfaces."""
     pkg_path = os.path.join('src', pkg_name)
-    
-    # 1. Create the .action file
+
+    # 1. Create action directory + file
     action_dir = os.path.join(pkg_path, 'action')
     os.makedirs(action_dir, exist_ok=True)
+
     action_file = "Fibonacci.action"
     action_file_path = os.path.join(action_dir, action_file)
-    
+
     if not os.path.exists(action_file_path):
         with open(action_file_path, 'w') as f:
             f.write("int32 order\n---\nint32[] sequence\n---\nint32[] partial_sequence\n")
         click.secho(f"✓ Created action definition: {action_file_path}", fg="green")
 
-    # 2. Update package.xml
+    # 2. Patch package.xml
     package_xml_path = os.path.join(pkg_path, 'package.xml')
-    with open(package_xml_path, 'r') as f: content = f.read()
-    
-    tags_to_add = []
-    if "rosidl_default_generators" not in content:
-        tags_to_add.append("  <build_depend>rosidl_default_generators</build_depend>")
-    if "rosidl_default_runtime" not in content:
-        tags_to_add.append("  <exec_depend>rosidl_default_runtime</exec_depend>")
-    if "rosidl_interface_packages" not in content:
-        tags_to_add.append("  <member_of_group>rosidl_interface_packages</member_of_group>")
+    with open(package_xml_path, 'r') as f:
+        content = f.read()
 
-    if tags_to_add and "</package>" in content:
-        insertion = "\n" + "\n".join(tags_to_add) + "\n"
+    required_tags = [
+        "<build_depend>rosidl_default_generators</build_depend>",
+        "<exec_depend>rosidl_default_runtime</exec_depend>",
+        "<member_of_group>rosidl_interface_packages</member_of_group>",
+    ]
+
+    add_lines = []
+    for tag in required_tags:
+        if tag not in content:
+            add_lines.append("  " + tag)
+
+    if add_lines:
+        insertion = "\n" + "\n".join(add_lines) + "\n"
         content = content.replace("</package>", insertion + "</package>")
-        with open(package_xml_path, 'w') as f: f.write(content)
+        with open(package_xml_path, 'w') as f:
+            f.write(content)
         click.secho(f"✓ Updated {package_xml_path} for action generation.", fg="green")
 
-    # 3. Update CMakeLists.txt safely
+    # 3. Patch CMakeLists.txt
     cmake_path = os.path.join(pkg_path, "CMakeLists.txt")
-    with open(cmake_path, 'r') as f: content = f.read()
+    with open(cmake_path, 'r') as f:
+        cmake = f.read()
 
-    # Add generators dependency if missing
-    if "rosidl_default_generators" not in content:
-        content = content.replace(
-            "find_package(ament_cmake REQUIRED)", 
+    # Add "find_package(rosidl_default_generators REQUIRED)" immediately after ament_cmake
+    if "find_package(rosidl_default_generators REQUIRED)" not in cmake:
+        cmake = cmake.replace(
+            "find_package(ament_cmake REQUIRED)",
             "find_package(ament_cmake REQUIRED)\nfind_package(rosidl_default_generators REQUIRED)"
         )
 
-    # Handle rosidl_generate_interfaces
+    # Insert rosidl_generate_interfaces after LAST find_package(...)
     action_entry = f'"action/{action_file}"'
-    if "rosidl_generate_interfaces" in content:
-        # Block exists, append action if not present
-        if action_file not in content:
-            pattern = f"rosidl_generate_interfaces(${{PROJECT_NAME}}"
-            replacement = f"{pattern}\n  {action_entry}"
-            content = content.replace(pattern, replacement)
-    else:
-        # Block missing, create it
-        rosidl_block = f'''
-rosidl_generate_interfaces(${{PROJECT_NAME}}
-  {action_entry}
-)
-'''
-        # FIX: Insert BEFORE the node definitions so targets exist when nodes are added
-        if "# --- REGULAR NODES INSERTION POINT ---" in content:
-            content = content.replace(
-                "# --- REGULAR NODES INSERTION POINT ---", 
-                f"{rosidl_block}\n# --- REGULAR NODES INSERTION POINT ---"
+
+    if "rosidl_generate_interfaces" not in cmake:
+        # find last find_package() occurrence
+        import re
+        matches = list(re.finditer(r"find_package\([^\)]+\)", cmake))
+        if matches:
+            last_pos = matches[-1].end()
+            rosidl_block = (
+                f"\nrosidl_generate_interfaces(${{PROJECT_NAME}})\n"
+                "ament_export_dependencies(rosidl_default_runtime)\n"
             )
-        elif "ament_package()" in content:
-             # Fallback
-             content = content.replace("ament_package()", f"{rosidl_block}\nament_package()")
-    
-    with open(cmake_path, 'w') as f: f.write(content)
+            cmake = cmake[:last_pos] + rosidl_block + cmake[last_pos:]
+
+    # Now insert or extend the rosidl_generate_interfaces block
+    if action_entry not in cmake:
+        cmake = cmake.replace(
+            "rosidl_generate_interfaces(${PROJECT_NAME}",
+            f"rosidl_generate_interfaces(${{PROJECT_NAME}}\n  {action_entry}"
+        )
+
+    with open(cmake_path, 'w') as f:
+        f.write(cmake)
+
     click.secho(f"✓ Updated {cmake_path} for action generation.", fg="green")
 
 def add_cpp_executable(pkg_name, node_name, dependencies=None):
@@ -622,79 +628,78 @@ def add_cpp_dependencies_to_package_xml(pkg_name, dependencies):
 def add_service_definition(pkg_name):
     """Creates the AddTwoInts.srv file and updates CMake/package.xml for it."""
     pkg_path = os.path.join('src', pkg_name)
-    
-    # 1. Create the .srv file
+
+    # 1. Create service file
     srv_dir = os.path.join(pkg_path, 'srv')
     os.makedirs(srv_dir, exist_ok=True)
-    srv_file = "AddTwoInts.srv"
-    srv_file_path = os.path.join(srv_dir, srv_file)
-    
-    if not os.path.exists(srv_file_path):
-        with open(srv_file_path, 'w') as f:
-            f.write("int64 a\nint64 b\n---\nint64 sum\n")
-        click.secho(f"✓ Created service definition: {srv_file_path}", fg="green")
 
-    # 2. Update package.xml
+    srv_file = "AddTwoInts.srv"
+    srv_path = os.path.join(srv_dir, srv_file)
+
+    if not os.path.exists(srv_path):
+        with open(srv_path, 'w') as f:
+            f.write("int64 a\nint64 b\n---\nint64 sum\n")
+        click.secho(f"✓ Created service definition: {srv_path}", fg="green")
+
+    # 2. Patch package.xml
     package_xml_path = os.path.join(pkg_path, 'package.xml')
     with open(package_xml_path, 'r') as f:
         content = f.read()
-    
-    tags_to_add = []
-    if "rosidl_default_generators" not in content:
-        tags_to_add.append("  <build_depend>rosidl_default_generators</build_depend>")
-    if "rosidl_default_runtime" not in content:
-        tags_to_add.append("  <exec_depend>rosidl_default_runtime</exec_depend>")
-    if "rosidl_interface_packages" not in content:
-        tags_to_add.append("  <member_of_group>rosidl_interface_packages</member_of_group>")
 
-    if tags_to_add and "</package>" in content:
-        insertion = "\n" + "\n".join(tags_to_add) + "\n"
+    required_tags = [
+        "<build_depend>rosidl_default_generators</build_depend>",
+        "<exec_depend>rosidl_default_runtime</exec_depend>",
+        "<member_of_group>rosidl_interface_packages</member_of_group>",
+    ]
+
+    add_lines = []
+    for tag in required_tags:
+        if tag not in content:
+            add_lines.append("  " + tag)
+
+    if add_lines:
+        insertion = "\n" + "\n".join(add_lines) + "\n"
         content = content.replace("</package>", insertion + "</package>")
         with open(package_xml_path, 'w') as f:
             f.write(content)
         click.secho(f"✓ Updated {package_xml_path} for service generation.", fg="green")
 
-    # 3. Update CMakeLists.txt
+    # 3. Patch CMakeLists.txt
     cmake_path = os.path.join(pkg_path, "CMakeLists.txt")
     with open(cmake_path, 'r') as f:
-        content = f.read()
+        cmake = f.read()
 
-    # Add dependency package finding if missing
-    if "rosidl_default_generators" not in content:
-        content = content.replace(
-            "find_package(ament_cmake REQUIRED)", 
+    # Ensure rosidl generators loaded
+    if "find_package(rosidl_default_generators REQUIRED)" not in cmake:
+        cmake = cmake.replace(
+            "find_package(ament_cmake REQUIRED)",
             "find_package(ament_cmake REQUIRED)\nfind_package(rosidl_default_generators REQUIRED)"
         )
-    
+
+    # Always insert rosidl_generate_interfaces after last find_package()
+    import re
+    matches = list(re.finditer(r"find_package\([^\)]+\)", cmake))
+
+    if matches:
+        last_pos = matches[-1].end()
+
+        if "rosidl_generate_interfaces" not in cmake:
+            rosidl_block = (
+                f"\nrosidl_generate_interfaces(${{PROJECT_NAME}})\n"
+                "ament_export_dependencies(rosidl_default_runtime)\n"
+            )
+            cmake = cmake[:last_pos] + rosidl_block + cmake[last_pos:]
+
     srv_entry = f'"srv/{srv_file}"'
 
-    if "rosidl_generate_interfaces" in content:
-        # FIX: If block exists (e.g. from Action), append the srv file if not present
-        if srv_file not in content:
-            pattern = f"rosidl_generate_interfaces(${{PROJECT_NAME}}"
-            replacement = f"{pattern}\n  {srv_entry}"
-            content = content.replace(pattern, replacement)
-    else:
-        # Create new block
-        rosidl_block = f'''
-rosidl_generate_interfaces(${{PROJECT_NAME}}
-  {srv_entry}
-)
-'''
-        # Insert BEFORE nodes to ensure targets are generated first
-        if "# --- REGULAR NODES INSERTION POINT ---" in content:
-            content = content.replace(
-                "# --- REGULAR NODES INSERTION POINT ---", 
-                f"{rosidl_block}\n# --- REGULAR NODES INSERTION POINT ---"
-            )
-        elif "ament_package()" in content:
-            content = content.replace(
-                "ament_package()", 
-                f"{rosidl_block}\nament_package()"
-            )
-        
+    if srv_entry not in cmake:
+        cmake = cmake.replace(
+            "rosidl_generate_interfaces(${PROJECT_NAME}",
+            f"rosidl_generate_interfaces(${{PROJECT_NAME}}\n  {srv_entry}"
+        )
+
     with open(cmake_path, 'w') as f:
-        f.write(content)
+        f.write(cmake)
 
     click.secho(f"✓ Updated {cmake_path} for service generation.", fg="green")
 def add_component_to_regular_launch(pkg_name, component_name):
@@ -830,25 +835,26 @@ def add_component_to_regular_launch(pkg_name, component_name):
 
 
 def add_cmake_find_package(pkg_name, package_to_find):
-    """Ensures a find_package() call exists in CMakeLists.txt."""
+    """Ensure find_package(pkg) exists immediately after ament_cmake."""
     cmake_path = os.path.join('src', pkg_name, "CMakeLists.txt")
-    if not os.path.exists(cmake_path): return
-
+    if not os.path.exists(cmake_path):
+        return
+    
     with open(cmake_path, 'r') as f:
         content = f.read()
-    
+
     if f"find_package({package_to_find}" in content:
         return
 
-    # Insert after the mandatory ament_cmake find_package
-    if "find_package(ament_cmake REQUIRED)" in content:
-        content = content.replace(
-            "find_package(ament_cmake REQUIRED)", 
-            f"find_package(ament_cmake REQUIRED)\nfind_package({package_to_find} REQUIRED)"
-        )
-        with open(cmake_path, 'w') as f:
-            f.write(content)
-        click.secho(f"✓ Added find_package({package_to_find}) to CMakeLists.txt", fg="green")
+    content = content.replace(
+        "find_package(ament_cmake REQUIRED)",
+        f"find_package(ament_cmake REQUIRED)\nfind_package({package_to_find} REQUIRED)"
+    )
+
+    with open(cmake_path, 'w') as f:
+        f.write(content)
+
+    click.secho(f"✓ Added find_package({package_to_find}) to CMakeLists.txt", fg="green")
 
 def make_cpp_component(pkg_name, component_name, component_type):
     """Creates a new C++ component and correctly registers it, adding component-specific
@@ -857,6 +863,9 @@ def make_cpp_component(pkg_name, component_name, component_type):
     class_name = "".join(word.capitalize() for word in component_name.split('_'))
     pkg_path = os.path.join('src', pkg_name)
     
+    # 1. Initialize Dependency List
+    component_deps = ["rclcpp", "rclcpp_components", "std_msgs", "pluginlib"]
+
     # --- 1. Get templates ---
     from genesys_cli.commands.templates import get_cpp_component_templates
     hpp_content, cpp_content, _, plugin_content = get_cpp_component_templates(component_type, pkg_name, class_name, component_name, f"A C++ component of type {component_type}")
@@ -879,6 +888,33 @@ def make_cpp_component(pkg_name, component_name, component_type):
 
     if component_type == 'Service':
         add_service_definition(pkg_name)
+    
+    # NEW: Handle ActionServer/ActionClient dependencies and file patching
+    if component_type == 'ActionServer' or component_type == 'ActionClient':
+        component_deps.append("rclcpp_action")
+        add_cmake_find_package(pkg_name, "rclcpp_action")
+        
+        # A. Generate local action definition (Assuming add_action_definition exists)
+        add_action_definition(pkg_name)
+        
+        # B. Patch the generated C++ files to use the local action interfaces
+        for file_path in [hpp_file_path, cpp_file_path]:
+            if os.path.exists(file_path):
+                with open(file_path, 'r') as f: content = f.read()
+                
+                # Replace generic/tutorial action header include with local package header
+                content = content.replace(
+                    "action_tutorials_interfaces/action/fibonacci.hpp", 
+                    f"{pkg_name}/action/fibonacci.hpp"
+                )
+                # Replace generic/tutorial action namespace
+                content = content.replace(
+                    "action_tutorials_interfaces::action::Fibonacci", 
+                    f"{pkg_name}::action::Fibonacci"
+                )
+                
+                with open(file_path, 'w') as f: f.write(content)
+        click.secho(f"✓ Patched C++ files to use local '{pkg_name}::action::Fibonacci'", fg="green")
 
     # --- 3. Create or update register_components.cpp ---
     register_components_path = os.path.join(src_dir, "register_components.cpp")
@@ -909,9 +945,8 @@ def make_cpp_component(pkg_name, component_name, component_type):
     component_src_file = f"src/{class_name}.cpp"
     
     # Logic to link the component library against generated interfaces (srv/msg/action)
-    # This is required so the component can find headers like "cpp_pkg/srv/add_two_ints.hpp"
     link_interfaces_block = f'''
-# Link against generated interfaces (messages/services)
+# Link against generated interfaces (messages/services/actions)
 rosidl_get_typesupport_target(ts_target "${{PROJECT_NAME}}" "rosidl_typesupport_cpp")
 if(TARGET "${{ts_target}}")
   target_link_libraries({pkg_name}_components "${{ts_target}}")
@@ -919,10 +954,11 @@ endif()
 '''
 
     if component_marker not in content:
-        # --- First component: add the entire component infrastructure ---
+        # --- First component: use the full dependency list ---
         ament_package_marker = "# --- Must be last ---"
         
         find_package_marker = "# --- Find dependencies ---"
+        # Note: rclcpp_components and pluginlib might be added by your existing logic too
         additional_find_packages = (
             '\nfind_package(rclcpp_components REQUIRED)\n'
             'find_package(pluginlib REQUIRED)'
@@ -943,10 +979,7 @@ target_include_directories({pkg_name}_components PUBLIC
   $<INSTALL_INTERFACE:include/${{PROJECT_NAME}}>)
 
 ament_target_dependencies({pkg_name}_components
-  rclcpp
-  rclcpp_components
-  std_msgs
-  pluginlib
+  {"\n  ".join(component_deps)}
 )
 
 {link_interfaces_block}
@@ -978,7 +1011,20 @@ install(
         click.secho(f"✓ Added component build infrastructure to {cmake_path}", fg="green")
 
     else:
-        # --- Subsequent component: just add to existing infrastructure ---
+        # --- Subsequent component: patch existing infrastructure ---
+        
+        # NEW: Patch dependencies into existing ament_target_dependencies block
+        if "rclcpp_action" in component_deps:
+            deps_pattern = re.compile(
+                r'(ament_target_dependencies\(\s*{}_components\s*\n)(.*?)(\n\)|\))'.format(re.escape(pkg_name)), 
+                re.DOTALL
+            )
+            match = deps_pattern.search(content)
+            if match and 'rclcpp_action' not in match.group(2):
+                # Only add if it's not already there
+                new_deps = match.group(2).strip() + '\n  rclcpp_action'
+                content = deps_pattern.sub(r'\1{}\n\3'.format(new_deps), content, 1)
+                click.secho(f"✓ Patched existing ament_target_dependencies to include rclcpp_action", fg="green")
         
         # FIX: Check if the interface linking is missing (repair existing files)
         if "rosidl_get_typesupport_target" not in content and f"{pkg_name}_components" in content:
@@ -1001,12 +1047,12 @@ install(
     with open(cmake_path, 'w') as f:
         f.write(content)
 
-    # --- 5. Create or update plugin.xml ---
+    # --- 5. Create or update plugin.xml (Unchanged) ---
     plugin_xml_path = os.path.join(resource_dir, f"{pkg_name}_plugin.xml")
     plugin_entry_snippet = (
-        f'  <class type="{pkg_name}::{class_name}" base_class_type="rclcpp::Node">\n'
-        f'    <description>A C++ component of type {component_type}.</description>\n'
-        '  </class>'
+        f'  <class type="{pkg_name}::{class_name}" base_class_type="rclcpp::Node">\n'
+        f'    <description>A C++ component of type {component_type}.</description>\n'
+        '  </class>'
     )
     if os.path.exists(plugin_xml_path):
         with open(plugin_xml_path, "r+") as f:
@@ -1021,19 +1067,20 @@ install(
             f.write(base_plugin_xml)
         click.secho(f"✓ Created plugin XML file: {plugin_xml_path}", fg="green")
 
-    # --- 6. Update package.xml for component support ---
-    add_cpp_dependencies_to_package_xml(pkg_name, ["rclcpp_components", "pluginlib"])
+    # --- 6. Update package.xml for component support (Fixed to use component_deps) ---
+    # Convert list for use in package.xml: ensure rclcpp_action is included.
+    dependencies_for_xml = [d for d in component_deps if d not in ["rclcpp_components", "pluginlib"]] + ["rclcpp_components", "pluginlib"]
+    add_cpp_dependencies_to_package_xml(pkg_name, dependencies_for_xml)
+
     package_xml_path = os.path.join(pkg_path, "package.xml")
     with open(package_xml_path, "r+") as f:
         content = f.read()
         if "<export>" not in content:
             content = content.replace("</package>", "\n<export>\n</export>\n</package>")
         if f'plugin="resource/{pkg_name}_plugin.xml"' not in content:
-            content = content.replace("</export>", f'  <rclcpp_components plugin="resource/{pkg_name}_plugin.xml"/>\n</export>')
+            content = content.replace("</export>", f'  <rclcpp_components plugin="resource/{pkg_name}_plugin.xml"/>\n</export>')
         f.seek(0); f.write(content); f.truncate()
     click.secho(f"✓ Updated package.xml for components", fg="green")
-
-
 
 def make_cpp_node(pkg_name, node_name, node_type):
     """Creates a new C++ node and registers it in the package."""
