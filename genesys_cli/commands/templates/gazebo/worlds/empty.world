@@ -1,11 +1,122 @@
-<?xml version="1.0" ?>
-<sdf version="1.6">
-  <world name="empty">
+<?xml version='1.0'?>
+<sdf version='1.6'>
+  <world name='warehouse_world'>
+    <physics name="1ms" type="ignored">
+      <max_step_size>0.001</max_step_size>
+      <real_time_factor>1.0</real_time_factor>
+    </physics>
+
+    <plugin
+      filename="libignition-gazebo-physics-system.so"
+      name="ignition::gazebo::systems::Physics">
+    </plugin>
+    <plugin
+      filename="libignition-gazebo-user-commands-system.so"
+      name="ignition::gazebo::systems::UserCommands">
+    </plugin>
+    <plugin
+      filename="libignition-gazebo-scene-broadcaster-system.so"
+      name="ignition::gazebo::systems::SceneBroadcaster">
+    </plugin>
+
     <include>
-      <uri>model://ground_plane</uri>
+      <uri>https://fuel.gazebosim.org/1.0/OpenRobotics/models/Ground Plane</uri>
     </include>
     <include>
-      <uri>model://sun</uri>
+      <uri>https://fuel.gazebosim.org/1.0/OpenRobotics/models/Sun</uri>
     </include>
-  </world>
+
+    <model name='wall_north'>
+        <static>true</static>
+        <pose>0 5.1 1.25 0 0 0</pose>
+        <link name='link'>
+            <collision name='col'><geometry><box><size>10 0.2 2.5</size></box></geometry></collision>
+            <visual name='vis'><geometry><box><size>10 0.2 2.5</size></box></geometry><material><ambient>0.5 0.5 0.5 1</ambient><diffuse>0.5 0.5 0.5 1</diffuse></material></visual>
+        </link>
+    </model>
+
+    <model name='wall_south'>
+        <static>true</static>
+        <pose>0 -5.1 1.25 0 0 0</pose>
+        <link name='link'>
+            <collision name='col'><geometry><box><size>10 0.2 2.5</size></box></geometry></collision>
+            <visual name='vis'><geometry><box><size>10 0.2 2.5</size></box></geometry><material><ambient>0.5 0.5 0.5 1</ambient><diffuse>0.5 0.5 0.5 1</diffuse></material></visual>
+        </link>
+    </model>
+
+    <model name='wall_west'>
+        <static>true</static>
+        <pose>-5.1 0 1.25 0 0 0</pose>
+        <link name='link'>
+            <collision name='col'><geometry><box><size>0.2 10.4 2.5</size></box></geometry></collision>
+            <visual name='vis'><geometry><box><size>0.2 10.4 2.5</size></box></geometry><material><ambient>0.5 0.5 0.5 1</ambient><diffuse>0.5 0.5 0.5 1</diffuse></material></visual>
+        </link>
+    </model>
+
+    <model name='wall_east'>
+        <static>true</static>
+        <pose>5.1 0 1.25 0 0 0</pose>
+        <link name='link'>
+            <collision name='col'><geometry><box><size>0.2 10.4 2.5</size></box></geometry></collision>
+            <visual name='vis'><geometry><box><size>0.2 10.4 2.5</size></box></geometry><material><ambient>0.5 0.5 0.5 1</ambient><diffuse>0.5 0.5 0.5 1</diffuse></material></visual>
+        </link>
+    </model>
+
+    <model name='rack_A'>
+      <static>true</static>
+      <pose>2.0 7.0 0 0 0 0</pose>
+      <link name='link'>
+        <collision name='col'><geometry><box><size>1.8 2.0 2.0</size></box></geometry><pose>0 0 1.0 0 0 0</pose></collision>
+        <visual name='vis'>
+            <geometry><box><size>1.8 2.0 2.0</size></box></geometry>
+            <pose>0 0 1.0 0 0 0</pose>
+            <material>
+                <ambient>0.6 0.4 0.2 1</ambient> <diffuse>0.6 0.4 0.2 1</diffuse>
+            </material>
+        </visual>
+      </link>
+    </model>
+
+    <model name='rack_B'>
+      <static>true</static>
+      <pose>8.0 7.0 0 0 0 0</pose>
+      <link name='link'>
+        <collision name='col'><geometry><box><size>1.8 2.0 2.0</size></box></geometry><pose>0 0 1.0 0 0 0</pose></collision>
+        <visual name='vis'>
+            <geometry><box><size>1.8 2.0 2.0</size></box></geometry>
+            <pose>0 0 1.0 0 0 0</pose>
+            <material>
+                <ambient>0.6 0.4 0.2 1</ambient>
+                <diffuse>0.6 0.4 0.2 1</diffuse>
+            </material>
+        </visual>
+      </link>
+    </model>
+
+    <model name='rack_C'>
+      <static>true</static>
+      <pose>2.0 3.5 0 0 0 0</pose>
+      <link name='link'>
+        <collision name='col'><geometry><box><size>1.8 2.0 2.0</size></box></geometry><pose>0 0 1.0 0 0 0</pose></collision>
+        <visual name='vis'>
+            <geometry><box><size>1.8 2.0 2.0</size></box></geometry>
+            <pose>0 0 1.0 0 0 0</pose>
+            <material>
+                <ambient>0.6 0.4 0.2 1</ambient>
+                <diffuse>0.6 0.4 0.2 1</diffuse>
+            </material>
+        </visual>
+      </link>
+    </model>
+
+    <model name='crate'>
+      <static>true</static>
+      <pose>1.0 2.0 0 0 0 0</pose>
+      <link name='link'>
+        <collision name='col'><geometry><box><size>0.6 0.6 0.6</size></box></geometry><pose>0 0 0.3 0 0 0</pose></collision>
+        <visual name='vis'><geometry><box><size>0.6 0.6 0.6</size></box></geometry><pose>0 0 0.3 0 0 0</pose></visual>
+      </link>
+    </model>
+
+    </world>
 </sdf>
