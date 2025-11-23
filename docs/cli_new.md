@@ -1,6 +1,6 @@
 # CLI Command: `genesys new`
 
-The `genesys new` command creates a new, structured ROS 2 workspace with the standard Genesys directory layout.
+The `genesys new` command creates a new, structured ROS 2 workspace with the standard Genesys directory layout, it also provides a package which contains the c++ macros for c++ nodes. It is contained in the genesys_macro directory.
 
 ## Usage
 

@@ -1,57 +1,95 @@
-# Pipelines in Genesys
+# Genesys Pipelines
 
-This document describes how to use pipelines in the Genesys framework.
+This document provides a comprehensive guide to the Genesys Pipeline YAML format.
 
-## What are pipelines?
+## What are Pipelines?
 
-Pipelines are a way to define a graph of connected ROS 2 nodes and components in a single YAML file. The Genesys CLI can then parse this file, generate a ROS 2 launch file in memory, and execute it. This is ideal for managing complex applications with many parts.
+Pipelines are a way to define and configure a complete graph of connected ROS 2 nodes in a single YAML file. The `genesys pipeline` CLI can then parse this file, generate a ROS 2 launch description in memory, and execute it. This is the ideal way to manage and run complex applications with many parts.
 
-Pipelines support both regular nodes (executables) and composable nodes (components/plugins), along with parameters and topic remapping.
+## How It Works: In-Memory Launch
+
+When you run `genesys pipeline run` or `watch`, the tool does not create a physical `.launch.py` file. Instead, it:
+1.  **Parses** the YAML file into a Python dictionary.
+2.  **Generates** a `LaunchDescription` object in memory based on your definitions.
+3.  **Automatically creates** a `ComposableNodeContainer` if any components (`plugin` nodes) are defined.
+4.  **Automatically namespaces** all nodes using the pipeline's `name`.
+5.  **Executes** this `LaunchDescription` directly using the `launch.LaunchService` API.
+
+---
 
 ## Pipeline YAML Structure
 
 A pipeline is defined by a top-level `pipeline` key.
 
 ```yaml
+#
+# Example: A simple vision pipeline
+#
 pipeline:
-  name: my_vision_pipeline
+  name: vision_system # This will be the ROS namespace for all nodes
   nodes:
-    - id: camera_node
+    # A component (plugin) that runs in the auto-generated container
+    - id: camera_producer
       package: image_publisher
-      executable: image_publisher_node
+      plugin: ImagePublisherNode
+      name: camera_node # Overrides the ROS node name
       parameters:
         - name: frequency
           value: 30.0
-
+    
+    # A regular executable node
     - id: image_processor
-      package: my_package
-      plugin: MyImageProcessor
-      parameters:
-        - name: brightness
-          value: 1.2
+      package: my_image_pkg
+      executable: processor_node
       remap:
-        /input_topic: /camera/image_raw
-        /output_topic: /processed_image
+        # Manually remap the input topic to the camera's output
+        /input_image: /vision_system/camera_node/image_raw
+
+    # Another component
+    - id: view_finder
+      package: my_ui_pkg
+      plugin: ImageViewNode
+      remap:
+        /input_image: /vision_system/image_processor/processed_image
 ```
 
 ### Top-Level Keys
-- **`name`**: A descriptive name for your pipeline. This is used as the default namespace for all nodes in the pipeline.
-- **`nodes`**: A list of node definitions.
+
+- **`name`** (required, string): A descriptive name for your pipeline. This value is automatically used as the ROS 2 **namespace for all nodes** in the pipeline. In the example above, all nodes will be launched under the `/vision_system` namespace.
+- **`nodes`** (required, list): A list of node definitions that make up the graph.
 
 ### Node Definition Keys
-- **`id`**: A unique identifier for the node within the pipeline.
-- **`package`**: The name of the ROS 2 package containing the node.
-- **`plugin`** (for Components): The name of the component plugin to load (e.g., the class name).
-- **`executable`** (for Regular Nodes): The name of the node executable.
-- **`name`** (optional): The ROS 2 node name. If omitted, the `id` is used.
-- **`parameters`** (optional): A list of parameters to set on the node. Each parameter is a dictionary with `name` and `value`.
-- **`remap`** (optional): A dictionary of topic remappings, where the key is the original topic name and the value is the new topic name.
 
-## CLI Usage
+Each entry in the `nodes` list is an object that defines one node.
 
-The `genesys pipeline` command is used to interact with these files.
+| Key | Required? | Type | Description |
+| :--- | :--- | :--- | :--- |
+| `id` | **Yes** | string | A unique identifier for the node within the pipeline. This is used for internal tracking. |
+| `package` | **Yes** | string | The name of the ROS 2 package containing the node. |
+| `plugin` | **Conditional** | string | The name of the component plugin to load (e.g., the class name). Use this for **components**. You must specify either `plugin` or `executable`. |
+| `executable` | **Conditional** | string | The name of the node executable. Use this for **regular, standalone nodes**. You must specify either `plugin` or `executable`. |
+| `name` | No | string | The final ROS 2 node name. If omitted, the node's `id` is used as its name. |
+| `parameters` | No | list | A list of parameters to set on the node. Each item in the list is an object with `name` (string) and `value` keys. The value can be a string, number, or boolean. |
+| `remap` | No | object | A dictionary of topic, service, or action remappings. The key is the original name and the value is the new name. |
 
-- **`genesys pipeline create <pipeline_name>`**: Creates a new boilerplate `pipeline_name.yaml` file.
-- **`genesys pipeline run <pipeline.yaml>`**: Parses the YAML file and launches the defined graph of nodes.
-- **`genesys pipeline watch <pipeline.yaml>`**: Runs the pipeline and automatically reloads it whenever the YAML file is saved, allowing for rapid iteration.
+---
 
+## Important Concepts
+
+### Component Container
+
+You do **not** need to define a container in your pipeline YAML. If the generator detects one or more nodes with the `plugin` key, it will **automatically create a single `ComposableNodeContainer`** for the entire pipeline. All nodes defined with `plugin` will be loaded into this container. The container will be named `<pipeline_name>_container`.
+
+Regular nodes defined with `executable` will be launched as separate processes, outside the container.
+
+### Namespacing
+
+All nodes, and the component container itself, are automatically namespaced with the top-level `name` of the pipeline. This is a powerful feature for isolating systems and avoiding topic name collisions.
+
+### A Note on `publish` and `subscribe`
+
+Some early examples or schemas may show `publish` and `subscribe` keys used for automatically connecting topics between nodes based on their `id`.
+
+**This feature is aspirational and is NOT currently implemented in the pipeline generator.**
+
+The generator will ignore these keys. To connect nodes, you **must** use the `remap` key to manually specify the topic connections, as shown in the example above. You should include the pipeline namespace in your remapping paths.
