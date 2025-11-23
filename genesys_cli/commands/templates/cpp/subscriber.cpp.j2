@@ -1,32 +1,25 @@
-#include "{{ package_name }}/{{ class_name }}.hpp"
+#include "genesys_macros/SubscriberMacro.hpp"
 
-namespace {{ package_name }}
-{
+ROS_UNIVERSAL_NODE(
+    {{class_name}},
 
-{{ class_name }}::{{ class_name }}()
-: rclcpp::Node("{{ class_name | lower }}")
-{
-    // Create subscription
-    subscription_ = create_subscription<std_msgs::msg::String>(
-        "chatter", rclcpp::QoS(10),
-        std::bind(&{{ class_name }}::topic_callback, this, std::placeholders::_1)
-    );
+    rclcpp::Subscription<std_msgs::msg::String>::SharedPtr sub_string_;
+    
+    void string_cb(const std_msgs::msg::String & msg) {
+        RCLCPP_INFO(this->get_logger(), "String: %s", msg.data.c_str());
+    }
+    , 
+    
+    sub_string_ = this->create_subscription<std_msgs::msg::String>(
+        "/chatter", 10, 
+        std::bind(&{{class_name}}::string_cb, this, std::placeholders::_1));
+)
 
-    RCLCPP_INFO(get_logger(), "{{ class_name }} node created");
-}
-
-void {{ class_name }}::topic_callback(const std_msgs::msg::String & msg) const
-{
-    RCLCPP_INFO(this->get_logger(), "I heard: '%s'", msg.data.c_str());
-
-}
-
-} // namespace {{ package_name }}
-
+// 4. Main Function (MUST ONLY BE HERE)
 int main(int argc, char * argv[])
 {
     rclcpp::init(argc, argv);
-    rclcpp::spin(std::make_shared<{{ package_name }}::{{ class_name }}>());
+    rclcpp::spin(std::make_shared<{{class_name}}>());
     rclcpp::shutdown();
     return 0;
 }

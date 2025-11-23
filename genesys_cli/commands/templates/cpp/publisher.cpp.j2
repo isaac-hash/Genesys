@@ -1,41 +1,20 @@
-#include "{{ package_name }}/{{ class_name }}.hpp"
+#include "genesys_macros/PublisherMacro.hpp"
 
-namespace {{ package_name }}
+// Generate a node class called "{{class_name}}"
+// It publishes std_msgs::msg::String
+// It fires every 1000ms
+// The callback name is on_timer
+ROS_PUBLISHING_NODE({{class_name}}, "chatter", std_msgs::msg::String, 1000, on_timer)
+
+size_t count_ = 0;
+
+void {{class_name}}::on_timer()
 {
-
-{{ class_name }}::{{ class_name }}()
-: rclcpp::Node("{{ class_name | lower }}")
-{
-    // Declare parameters
-    declare_parameter("message_data", "Hello from Genesys C++! #");
-    message_data_ = get_parameter("message_data").as_string();
-
-    // Create publisher
-    publisher_ = create_publisher<std_msgs::msg::String>("chatter", rclcpp::QoS(10));
-
-    // Create timer for publishing
-    timer_ = create_wall_timer(
-        std::chrono::milliseconds(1000),
-        std::bind(&{{ class_name }}::on_timer, this)
-    );
-
-    RCLCPP_INFO(get_logger(), "{{ class_name }} node created");
+    std_msgs::msg::String msg;
+    msg.data = "Hello from MACRO node #" + std::to_string(count_++);
+    RCLCPP_INFO(this->get_logger(), "%s", msg.data.c_str());
+    publisher_->publish(msg);
 }
 
-void {{ class_name }}::on_timer()
-{
-    auto message = std_msgs::msg::String();
-    message.data = message_data_ + std::to_string(count_++);
-    RCLCPP_INFO(get_logger(), "Publishing: '%s'", message.data.c_str());
-    publisher_->publish(message);
-}
-
-} // namespace {{ package_name }}
-
-int main(int argc, char * argv[])
-{
-    rclcpp::init(argc, argv);
-    rclcpp::spin(std::make_shared<{{ package_name }}::{{ class_name }}>());
-    rclcpp::shutdown();
-    return 0;
-}
+// Generate the main
+ROS_NODE_MAIN({{class_name}})

@@ -1,0 +1,41 @@
+#include "{{ package_name }}/{{ class_name }}.hpp"
+
+namespace {{ package_name }}
+{
+
+{{ class_name }}::{{ class_name }}()
+: rclcpp::Node("{{ class_name | lower }}")
+{
+    // Declare parameters
+    declare_parameter("message_data", "Hello from Genesys C++! #");
+    message_data_ = get_parameter("message_data").as_string();
+
+    // Create publisher
+    publisher_ = create_publisher<std_msgs::msg::String>("chatter", rclcpp::QoS(10));
+
+    // Create timer for publishing
+    timer_ = create_wall_timer(
+        std::chrono::milliseconds(1000),
+        std::bind(&{{ class_name }}::on_timer, this)
+    );
+
+    RCLCPP_INFO(get_logger(), "{{ class_name }} node created");
+}
+
+void {{ class_name }}::on_timer()
+{
+    auto message = std_msgs::msg::String();
+    message.data = message_data_ + std::to_string(count_++);
+    RCLCPP_INFO(get_logger(), "Publishing: '%s'", message.data.c_str());
+    publisher_->publish(message);
+}
+
+} // namespace {{ package_name }}
+
+int main(int argc, char * argv[])
+{
+    rclcpp::init(argc, argv);
+    rclcpp::spin(std::make_shared<{{ package_name }}::{{ class_name }}>());
+    rclcpp::shutdown();
+    return 0;
+}
