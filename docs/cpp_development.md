@@ -1,183 +1,157 @@
-# C++ Development with Genesys Macros
+# C++ Development with the `genesys_macros` Package
 
-The Genesys framework provides a powerful, macro-based declarative system for C++ that mirrors the convenience of the Python decorator API. It is designed to significantly reduce boilerplate code when creating ROS 2 nodes and components.
+The `genesys_macros` package is an auxiliary ROS 2 package provided with the Genesys toolkit. It offers a straightforward, header-only macro system designed to rapidly scaffold simple C++ nodes. This provides an alternative to more complex, feature-rich node-authoring systems and is ideal for quick prototyping or for developers who prefer a more direct, file-based approach to node creation.
 
-This guide explains how the system works and how to use the macros provided in `genesys/macros.hpp`.
+## Package Structure
 
-## How It Works: Static Registration
+The `genesys_macros` package is a standard ROS 2 `ament_cmake` package with the following key files:
 
-For those interested in the underlying mechanism, the system is built on a C++ pattern called **static registration**.
+-   **`package.xml`**: Defines the package name (`genesys_macros`), dependencies, and build information. It depends on `ament_cmake`.
+-   **`CMakeLists.txt`**: Contains the build logic. It finds necessary dependencies and ensures the `include` directory is correctly exported, making the macros available to other packages that depend on it.
+-   **`include/genesys_macros/`**: This directory contains the header files where the macros are defined.
+    -   `PublisherMacro.hpp`: Contains macros for creating basic nodes, nodes with timers, and publishing nodes.
+    -   `SubscriberMacro.hpp`: Contains a "universal" macro for creating flexible nodes, often used for subscribers.
 
-1.  **`NodeRegistry`**: A global, templated `NodeRegistry<YourClass>` struct exists for each node class you define. It contains static vectors to store metadata about your desired parameters, publishers, subscribers, and timers.
-2.  **Macros and Static Objects**: When you use a macro like `GEN_PARAM` or `GEN_PUB`, it defines a private `static` object inside your class. The constructor of this static object runs when the program is first loaded, before `main()` is even called. This constructor's job is to add the metadata for that parameter or publisher into the class's `NodeRegistry`.
-3.  **`GenesysNodeMixin`**: When your node is created, it inherits from `GenesysNodeMixin`. This mixin contains the "engine." During construction (or in the `on_configure` step for lifecycle nodes), it calls an `_init_genesys()` function.
-4.  **Wiring**: The `_init_genesys()` function iterates through the now-populated static vectors in the `NodeRegistry`. For each piece of metadata, it calls the appropriate ROS 2 function (`create_publisher`, `create_subscription`, etc.) to build the ROS entities and connect them to your class methods.
+## Macro Usage Guide
 
-This approach allows you to declare the structure of your node, and the framework handles the imperative setup code for you.
+The following macros are designed to generate entire C++ class definitions and, in some cases, the `main()` entrypoint.
+
+---
+
+### `ROS_NODE_CLASS(NODE_NAME)`
+
+-   **Header**: `PublisherMacro.hpp`
+-   **Purpose**: Creates a minimal `rclcpp::Node` class. It generates a constructor that logs a startup message.
+-   **Parameters**:
+    -   `NODE_NAME`: The name for the C++ class and the ROS node.
+-   **Example**:
+
+    ```cpp
+    #include "genesys_macros/PublisherMacro.hpp"
+
+    // This expands into a class named 'MySimpleNode'
+    ROS_NODE_CLASS(MySimpleNode)
+
+    // You still need a main function to run it
+    int main(int argc, char* argv[])
+    {
+        rclcpp::init(argc, argv);
+        rclcpp::spin(std::make_shared<MySimpleNode>());
+        rclcpp::shutdown();
+        return 0;
+    }
+    ```
 
 ---
 
-## Usage Guide
+### `ROS_NODE_WITH_TIMER(NODE_NAME, TIMER_MS, CALLBACK_FN)`
 
-The following macros are intended to be used inside a C++ class definition. The `genesys make node` and `genesys make component` commands will generate files that already use this structure.
+-   **Header**: `PublisherMacro.hpp`
+-   **Purpose**: Generates a node containing a recurring wall timer that triggers a callback function.
+-   **Parameters**:
+    -   `NODE_NAME`: The name for the C++ class and the ROS node.
+    -   `TIMER_MS`: The period of the timer in milliseconds.
+    -   `CALLBACK_FN`: The name of the member function to be called by the timer. **You must provide the implementation for this function.**
+-   **Example**:
 
-### 1. Creating a Node
+    ```cpp
+    #include "genesys_macros/PublisherMacro.hpp"
 
-First, you must define your class using one of the node-creation macros.
+    // Generates class 'MyTimerNode' with a 500ms timer
+    ROS_NODE_WITH_TIMER(MyTimerNode, 500, timer_callback)
 
-#### `GEN_NODE(ClassName, node_name)`
-Use this for a standard ROS 2 node.
+    // You must implement the callback
+    void MyTimerNode::timer_callback()
+    {
+        RCLCPP_INFO(this->get_logger(), "Timer fired!");
+    }
 
-- **`ClassName`**: The name of your C++ class.
-- **`node_name`**: The string name of the ROS 2 node.
-
-```cpp
-// In your_node.hpp
-#include "genesys/macros.hpp"
-
-class MyNode
-{
-    GEN_NODE(MyNode, "my_node_name") // No semicolon needed
-
-    // Other macros go here
-};
-```
-
-#### `GEN_LIFECYCLE_NODE(ClassName, node_name)`
-Use this for a lifecycle node. The mixin will automatically handle calling the initialization functions in `on_configure` and managing resource cleanup.
-
-```cpp
-// In your_lifecycle_node.hpp
-#include "genesys/macros.hpp"
-
-class MyLifecycleNode
-{
-    GEN_LIFECYCLE_NODE(MyLifecycleNode, "my_lifecycle_node") // No semicolon
-
-    // You can override on_configure, on_activate, etc. if you need custom logic,
-    // but be sure to call the base implementation.
-};
-```
----
-### 2. Defining ROS Entities
-
-#### `GEN_PARAM(attr_name, param_name, default_value)`
-Declares a ROS 2 parameter and a corresponding public member variable.
-
-- `attr_name`: The name of the C++ member variable.
-- `param_name`: The string name of the ROS 2 parameter.
-- `default_value`: The default value. The type of the member variable is inferred from this.
-
-```cpp
-class MyNode
-{
-    GEN_NODE(MyNode, "my_node")
-    GEN_PARAM(threshold_, "threshold", 100.0) // Creates public member `double threshold_`
-};
-```
-The framework automatically creates a parameter callback. When you change the parameter externally (`ros2 param set`), the `threshold_` member variable in your class instance will be updated.
-
-#### `GEN_PUB(topic_name, msg_type, qos)`
-Creates a publisher and a public method for publishing messages.
-
-- `topic_name`: The name of the topic. This also becomes the name of the publish method.
-- `msg_type`: The message type (e.g., `std_msgs::msg::String`).
-- `qos`: A QoS profile object (e.g., `rclcpp::SensorDataQoS()`).
-
-```cpp
-// In your .hpp file
-#include <std_msgs/msg/string.hpp>
-
-class MyNode
-{
-    GEN_NODE(MyNode, "my_node")
-    GEN_PUB(chatter, std_msgs::msg::String, rclcpp::SystemDefaultsQoS())
-};
-
-// In your .cpp file
-// You can now call the 'chatter' method to publish
-void some_method() {
-    auto msg = std_msgs::msg::String();
-    msg.data = "Hello";
-    this->chatter(msg); // Publishes the message
-}
-```
-
-#### `GEN_SUB(topic_name, msg_type, qos)`
-Creates a subscription and declares the callback method you must implement.
-
-- `topic_name`: The name of the topic to subscribe to. This also becomes the name of the callback method.
-- `msg_type`: The message type.
-- `qos`: A QoS profile object.
-
-```cpp
-// In your .hpp file
-#include <std_msgs/msg/string.hpp>
-
-class MyNode
-{
-    GEN_NODE(MyNode, "my_node")
-    GEN_SUB(chatter, std_msgs::msg::String, rclcpp::SystemDefaultsQoS())
-};
-
-// In your .cpp file - YOU MUST IMPLEMENT THE METHOD
-void MyNode::chatter(std::shared_ptr<const std_msgs::msg::String> msg)
-{
-    RCLCPP_INFO(this->get_logger(), "I heard: '%s'", msg->data.c_str());
-}
-```
-
-#### `GEN_TIMER(method_name, period_ms)`
-Creates a wall timer and declares the callback method you must implement.
-
-- `method_name`: The name of the timer callback method.
-- `period_ms`: The timer period in **milliseconds**.
-
-```cpp
-// In your .hpp file
-class MyNode
-{
-    GEN_NODE(MyNode, "my_node")
-    GEN_TIMER(timer_callback, 500) // 500ms = 2Hz
-};
-
-// In your .cpp file - YOU MUST IMPLEMENT THE METHOD
-void MyNode::timer_callback()
-{
-    RCLCPP_INFO(this->get_logger(), "Timer fired!");
-}
-```
+    // Main function needed to run
+    ROS_NODE_MAIN(MyTimerNode)
+    ```
 
 ---
-## Generated Code from `genesys make`
 
-When you run `genesys make node --pkg my_cpp_pkg` or `genesys make component --pkg my_cpp_pkg`, the tool generates header (`.hpp`) and source (`.cpp`) files that use this macro system. Your job is simply to fill in the business logic inside the generated method bodies.
+### `ROS_PUBLISHING_NODE(NODE_NAME, TOPIC, MSG_TYPE, TIMER_MS, CALLBACK_FN)`
 
-For example, a generated C++ publisher component might look like this:
+-   **Header**: `PublisherMacro.hpp`
+-   **Purpose**: Generates a node that includes a publisher and a timer. The timer's callback is intended to be used for publishing messages.
+-   **Parameters**:
+    -   `NODE_NAME`: The name for the C++ class and the ROS node.
+    -   `TOPIC`: A string literal for the topic name (e.g., `"chatter"`).
+    -   `MSG_TYPE`: The message type (e.g., `std_msgs::msg::String`).
+    -   `TIMER_MS`: The period of the timer in milliseconds.
+    -   `CALLBACK_FN`: The name of the callback function where you can access the `publisher_` member to send messages. **You must implement this function.**
+-   **Example**:
 
-```cpp
-// my_component.hpp
-#pragma once
+    ```cpp
+    #include "genesys_macros/PublisherMacro.hpp"
+    #include "std_msgs/msg/string.hpp"
 
-#include "genesys/macros.hpp"
-#include <std_msgs/msg/string.hpp>
+    ROS_PUBLISHING_NODE(MyPublisher, "hello_world", std_msgs::msg::String, 1000, publish_message)
 
-namespace my_cpp_pkg
-{
+    void MyPublisher::publish_message()
+    {
+        auto msg = std::make_unique<std_msgs::msg::String>();
+        msg->data = "Hello from the macro!";
+        publisher_->publish(std::move(msg)); // 'publisher_' is a member of the generated class
+    }
 
-class MyComponent
-{
-    GEN_LIFECYCLE_NODE(MyComponent, "my_component")
+    ROS_NODE_MAIN(MyPublisher)
+    ```
 
-    GEN_PARAM(frequency_, "frequency", 2.0)
-    GEN_PUB(output_topic, std_msgs::msg::String, rclcpp::SystemDefaultsQoS())
-    GEN_TIMER(timer_callback, 500) // period is calculated from frequency later
+---
 
-private:
-    int count_ = 0;
-};
+### `ROS_UNIVERSAL_NODE(NODE_NAME, DECLARATIONS, INITIALIZERS)`
 
-} // namespace my_cpp_pkg
-```
+-   **Header**: `SubscriberMacro.hpp`
+-   **Purpose**: A highly flexible macro for defining a node with custom member variables and constructor logic. It is particularly useful for creating subscribers or other complex nodes.
+-   **Parameters**:
+    -   `NODE_NAME`: The name for the C++ class and the ROS node.
+    -   `DECLARATIONS`: A block of C++ code for declaring member variables (like publishers, subscribers, timers) and member function prototypes.
+    -   `INITIALIZERS`: A block of C++ code that will be placed inside the node's constructor to initialize the members defined in `DECLARATIONS`.
+-   **Example (Subscriber)**:
 
-You would then open the corresponding `my_component.cpp` file and implement the `timer_callback` method to do the work and publish the message.
+    ```cpp
+    #include "genesys_macros/SubscriberMacro.hpp"
+    #include "std_msgs/msg/string.hpp"
+
+    ROS_UNIVERSAL_NODE(
+        MySubscriber,
+        // --- Declarations ---
+        rclcpp::Subscription<std_msgs::msg::String>::SharedPtr sub_;
+        void topic_callback(const std_msgs::msg::String::SharedPtr msg);
+        , // Note the comma separating the blocks
+        // --- Initializers ---
+        sub_ = this->create_subscription<std_msgs::msg::String>(
+            "hello_world", 10, std::bind(&MySubscriber::topic_callback, this, std::placeholders::_1));
+    )
+
+    // You must implement the callback function
+    void MySubscriber::topic_callback(const std_msgs::msg::String::SharedPtr msg)
+    {
+        RCLCPP_INFO(this->get_logger(), "I heard: '%s'", msg->data.c_str());
+    }
+
+    ROS_NODE_MAIN(MySubscriber)
+    ```
+
+---
+
+### `ROS_NODE_MAIN(NODE_NAME)`
+
+-   **Header**: `PublisherMacro.hpp`
+-   **Purpose**: Generates the standard `main()` function entrypoint needed to run a ROS 2 node. It handles `rclcpp::init`, `rclcpp::spin`, and `rclcpp::shutdown`.
+-   **Parameters**:
+    -   `NODE_NAME`: The name of the node class to instantiate and spin.
+-   **Example**:
+
+    ```cpp
+    #include "genesys_macros/PublisherMacro.hpp"
+
+    // Define your node class first
+    ROS_NODE_CLASS(MyAwesomeNode)
+
+    // This expands into the main() function for MyAwesomeNode
+    ROS_NODE_MAIN(MyAwesomeNode)
+    ```
