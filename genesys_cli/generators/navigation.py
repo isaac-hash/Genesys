@@ -98,13 +98,19 @@ def generate_navigation_package(config: NavigationConfig, output_root: Path):
         context
     )
     
-    # 2. bringup.launch.py (To be created)
+    # 2. bringup.launch.py
     if (template_dir / "launch" / "bringup.launch.py.j2").exists():
         render_template(
             template_dir / "launch" / "bringup.launch.py.j2",
             pkg_nav / "launch" / "bringup.launch.py",
             context
         )
+    
+    # 3. Scaffolding (package.xml, CMakeLists.txt)
+    context_nav = context.copy()
+    context_nav["package_suffix"] = "navigation"
+    render_template(template_dir / "package_common" / "package.xml.j2", pkg_nav / "package.xml", context_nav)
+    render_template(template_dir / "package_common" / "CMakeLists.txt.j2", pkg_nav / "CMakeLists.txt", context_nav)
         
     print(f"Generated navigation package at {pkg_nav}")
     
@@ -116,6 +122,14 @@ def generate_navigation_package(config: NavigationConfig, output_root: Path):
         context
     )
     
+    # 2. rsp.launch.py
+    if (template_dir / "launch" / "rsp.launch.py.j2").exists():
+        render_template(
+            template_dir / "launch" / "rsp.launch.py.j2",
+            pkg_desc / "launch" / "rsp.launch.py",
+            context
+        )
+    
     # Sensors
     if config.sensors.lidar_2d:
         if (template_dir / "urdf" / "sensors" / "lidar.xacro.j2").exists():
@@ -124,6 +138,12 @@ def generate_navigation_package(config: NavigationConfig, output_root: Path):
                 pkg_desc / "urdf" / "sensors" / "lidar.xacro",
                 context
             )
+    
+    # Scaffolding
+    context_desc = context.copy()
+    context_desc["package_suffix"] = "description"
+    render_template(template_dir / "package_common" / "package.xml.j2", pkg_desc / "package.xml", context_desc)
+    render_template(template_dir / "package_common" / "CMakeLists.txt.j2", pkg_desc / "CMakeLists.txt", context_desc)
             
     print(f"Generated description package at {pkg_desc}")
 
@@ -135,4 +155,11 @@ def generate_navigation_package(config: NavigationConfig, output_root: Path):
                 pkg_sim / "launch" / "simulation.launch.py",
                 context
             )
+             
+        # Scaffolding
+        context_sim = context.copy()
+        context_sim["package_suffix"] = "simulation"
+        render_template(template_dir / "package_common" / "package.xml.j2", pkg_sim / "package.xml", context_sim)
+        render_template(template_dir / "package_common" / "CMakeLists.txt.j2", pkg_sim / "CMakeLists.txt", context_sim)
+        
         print(f"Generated simulation package at {pkg_sim}")

@@ -10,6 +10,8 @@ Panels:
         - /TF1
         - /LaserScan1
         - /Map1
+        - /Local Costmap1
+        - /Global Costmap1
       Splitter Ratio: 0.5
     Tree Height: 557
 Visualization Manager:
@@ -72,6 +74,43 @@ Visualization Manager:
         Value: /map
       Enabled: true
       Name: Map
+      Alpha: 0.7
+    - Class: nav2_rviz_plugins/Costmap
+      Topic:
+        Depth: 5
+        Durability Policy: Volatile
+        History Policy: Keep Last
+        Reliability Policy: Reliable
+        Value: /global_costmap/costmap
+      Enabled: true
+      Name: Global Costmap
+    - Class: nav2_rviz_plugins/Costmap
+      Topic:
+        Depth: 5
+        Durability Policy: Volatile
+        History Policy: Keep Last
+        Reliability Policy: Reliable
+        Value: /local_costmap/costmap
+      Enabled: true
+      Name: Local Costmap
+    - Class: nav2_rviz_plugins/Path
+      Topic:
+        Depth: 5
+        Durability Policy: Volatile
+        History Policy: Keep Last
+        Reliability Policy: Reliable
+        Value: /plan
+      Enabled: true
+      Name: Global Plan
+    - Class: nav2_rviz_plugins/Path
+      Topic:
+        Depth: 5
+        Durability Policy: Volatile
+        History Policy: Keep Last
+        Reliability Policy: Reliable
+        Value: /local_plan
+      Enabled: true
+      Name: Local Plan
   Enabled: true
   Global Options:
     Background Color: 48; 48; 48

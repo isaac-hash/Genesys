@@ -12,7 +12,11 @@ amcl:
     global_frame_id: "map"
     odom_frame_id: "odom"
     scan_topic: "/scan"
-    robot_model_type: "nav2_amcl::DifferentialMotionModel"  {# Specific to differential drive #}
+    {% if config.drive_type.value == 'omni' %}
+    robot_model_type: "nav2_amcl::OmnidirectionalMotionModel"
+    {% else %}
+    robot_model_type: "nav2_amcl::DifferentialMotionModel"
+    {% endif %}
     transform_tolerance: 1.0
     # ... (other AMCL defaults from sam_bot/nav2_bringup)
 
@@ -42,7 +46,6 @@ controller_server:
       # ... additional RPP params (lookahead_dist, etc.)
 
     footprint: "{{ footprint }}"
-    robot_radius: {{ robot_radius }}
 
 local_costmap:
   local_costmap:
@@ -81,7 +84,7 @@ global_costmap:
       update_frequency: 1.0
       publish_frequency: 1.0
       resolution: 0.05
-      robot_radius: {{ robot_radius }}
+      footprint: "{{ footprint }}"
       plugins: ["static_layer", "obstacle_layer", "inflation_layer"]
       # Similar obstacle_layer config as local
       # ...
