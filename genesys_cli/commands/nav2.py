@@ -113,9 +113,40 @@ def init(output):
     click.echo(f"Navigation configuration saved to {output_path}")
 
 @nav2.command()
-def generate():
-    """Generate Nav2 scaffolding (Stub)."""
-    click.echo("Generating Nav2 scaffolding... (Not implemented in Phase 1)")
+@click.option('--config', default='config/navigation.yaml', help='Path to navigation configuration file')
+def generate(config):
+    """Generate Nav2 scaffolding based on configuration."""
+    config_path = Path(config)
+    if not config_path.exists():
+        click.secho(f"Error: Configuration file not found at {config_path}", fg="red")
+        return
+
+    try:
+        with open(config_path, 'r') as f:
+            config_data = yaml.safe_load(f)
+            
+        nav_config = NavigationConfig(**config_data)
+        
+        # Determine output root (workspace root, assumed to be CWD or parent of config)
+        # We'll generate relative to CWD for now, or assume CWD is workspace root
+        output_root = Path.cwd()
+        
+        from genesys_cli.generators.navigation import generate_navigation_package
+        generate_navigation_package(nav_config, output_root)
+        
+        click.secho("\nGeneration complete!", fg="green")
+        click.echo("Next steps:")
+        click.echo("  1. colcon build")
+        click.echo("  2. source install/setup.bash")
+        click.echo(f"  3. ros2 launch {nav_config.robot_name}_navigation bringup.launch.py")
+        
+        if nav_config.simulation:
+             click.echo(f"  (For simulation: ros2 launch {nav_config.robot_name}_simulation simulation.launch.py)")
+
+    except ValidationError as e:
+        click.secho(f"Configuration is invalid: {e}", fg="red")
+    except Exception as e:
+        click.secho(f"Generation failed: {e}", fg="red")
 
 @nav2.command()
 @click.argument('section', type=click.Choice(['urdf', 'params', 'launch', 'sensors']))

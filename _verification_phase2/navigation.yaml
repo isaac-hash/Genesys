@@ -1,0 +1,27 @@
+robot_name: "test_bot"
+drive_type: "differential"
+simulation: true
+geometry:
+  length: 0.5
+  width: 0.3
+  height: 0.2
+  wheel_base: 0.3
+  wheel_radius: 0.05
+sensors:
+  lidar_2d: true
+  lidar_3d: false
+  depth_camera: false
+  rgb_camera: false
+  imu: true
+odometry:
+  fuse_imu: true
+params:
+  environment: "indoor"
+  max_linear_velocity: 0.5
+  max_angular_velocity: 1.0
+frames:
+  base_link: "base_link"
+  odom: "odom"
+  map: "map"
+  scan_topic: "/scan"
+  imu_topic: "/imu/data"
