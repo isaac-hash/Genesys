@@ -1,0 +1,18 @@
+<?xml version="1.0"?>
+<robot xmlns:xacro="http://ros.org/wiki/xacro">
+  <!-- Placeholder for base robot description -->
+  <xacro:macro name="base_robot">
+    <link name="base_link">
+      <visual>
+        <geometry>
+          <box size="${config.navigation.geometry.length} ${config.navigation.geometry.width} ${config.navigation.geometry.height}"/>
+        </geometry>
+      </visual>
+      <collision>
+         <geometry>
+          <box size="${config.navigation.geometry.length} ${config.navigation.geometry.width} ${config.navigation.geometry.height}"/>
+        </geometry>
+      </collision>
+    </link>
+  </xacro:macro>
+</robot>

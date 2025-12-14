@@ -57,6 +57,44 @@ def new(project_name):
             click.secho("Warning: Could not find 'genesys_macros' package data. It may not be installed correctly.", fg="yellow")
 
         click.secho(f"✓ Project '{project_name}' created successfully.", fg="green")
+        
+        # --- Nav2 Integration ---
+        if click.confirm("Enable autonomous navigation with Nav2?", default=False):
+            from genesys_cli.config.navigation_config import (
+                NavigationConfig, GeometryConfig, SensorConfig, OdometryConfig, NavParams
+            )
+            import yaml
+            
+            nav_config_path = os.path.join(workspace_root, 'config', 'navigation.yaml')
+            
+            # Create default config
+            default_config = NavigationConfig(
+                robot_name=project_name,
+                drive_type="differential",
+                simulation=True,
+                geometry=GeometryConfig(
+                    length=0.5, width=0.4, height=0.2, 
+                    wheel_base=0.3, wheel_radius=0.1
+                ),
+                sensors=SensorConfig(),
+                odometry=OdometryConfig(),
+                params=NavParams()
+            )
+            
+            with open(nav_config_path, 'w') as f:
+                yaml.dump(default_config.dict(), f, default_flow_style=False)
+            click.secho(f"✓ Created default Nav2 config at config/navigation.yaml", fg="green")
+            
+            if click.confirm("Do you want to configure navigation settings now?", default=True):
+                from genesys_cli.commands.nav2 import prompt_for_config
+                try:
+                    user_config = prompt_for_config()
+                    with open(nav_config_path, 'w') as f:
+                        yaml.dump(user_config.dict(), f, default_flow_style=False)
+                    click.secho(f"✓ Updated navigation config.", fg="green")
+                except click.Abort:
+                    click.secho("Configuration aborted. Keeping defaults.", fg="yellow")
+
         click.echo("Next steps: 'cd {}' and start creating packages!".format(project_name))
         
     except Exception as e:
