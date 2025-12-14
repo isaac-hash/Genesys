@@ -1,208 +1,103 @@
-{
-  "$schema": "http://json-schema.org/draft-07/schema#",
-  "title": "Genesis CLI Simulation Package Guardrail",
-  "description": "Guide for implementing 'genesis sim' CLI commands to create and run ROS 2 Gazebo simulation packages in the sim/ workspace.",
-  "type": "object",
-  "properties": {
-    "cli_commands": {
-      "type": "array",
-      "items": [
-        {
-          "type": "object",
-          "properties": {
-            "name": { "type": "string", "const": "genesis sim create" },
-            "description": { "type": "string", "const": "Creates a new *_gazebo package in sim/ for a robot." },
-            "arguments": {
-              "type": "object",
-              "properties": {
-                "package_name": {
-                  "type": "string",
-                  "pattern": "^[a-z0-9_]+_gazebo$",
-                  "description": "Name of the gazebo package (e.g., ur_gazebo)."
-                },
-                "from": {
-                  "type": "string",
-                  "pattern": "^[a-z0-9_]+(_description)?$",
-                  "description": "Source robot description package (e.g., ur_description)."
-                }
-              },
-              "required": ["package_name", "from"]
-            },
-            "behavior": {
-              "type": "object",
-              "properties": {
-                "output_path": { "type": "string", "const": "sim/<package_name>" },
-                "create_directories": {
-                  "type": "array",
-                  "items": { "type": "string" },
-                  "enum": ["launch", "config", "worlds", "models", "urdf", "plugins", "scripts"],
-                  "minItems": 7,
-                  "maxItems": 7
-                },
-                "create_files": {
-                  "type": "array",
-                  "items": {
-                    "type": "object",
-                    "properties": {
-                      "path": { "type": "string" },
-                      "template": { "type": "string" },
-                      "description": { "type": "string" }
-                    },
-                    "required": ["path", "template"]
-                  },
-                  "enum": [
-                    {
-                      "path": "CMakeLists.txt",
-                      "template": "templates/gazebo/CMakeLists.txt.j2",
-                      "description": "CMake build file for the gazebo package."
-                    },
-                    {
-                      "path": "package.xml",
-                      "template": "templates/gazebo/package.xml.j2",
-                      "description": "ROS 2 package manifest."
-                    },
-                    {
-                      "path": "launch/<package_name>.launch.py",
-                      "template": "templates/gazebo/launch/main.launch.py.j2",
-                      "description": "Main launch file for Gazebo world + robot."
-                    },
-                    {
-                      "path": "launch/spawn_<robot_name>.launch.py",
-                      "template": "templates/gazebo/launch/spawn.launch.py.j2",
-                      "description": "Launch file to spawn the robot."
-                    },
-                    {
-                      "path": "config/controllers.yaml",
-                      "template": "templates/gazebo/config/controllers.yaml.j2",
-                      "description": "Controller configuration."
-                    },
-                    {
-                      "path": "worlds/empty.world",
-                      "template": "templates/gazebo/worlds/empty.world",
-                      "description": "Minimal Gazebo world file."
-                    }
-                  ]
-                },
-                "symlink": {
-                  "type": "object",
-                  "properties": {
-                    "target": { "type": "string", "const": "urdf" },
-                    "source": { "type": "string", "const": "../../<from>/urdf" }
-                  },
-                  "required": ["target", "source"]
-                },
-                "metadata": {
-                  "type": "object",
-                  "properties": {
-                    "file": { "type": "string", "const": "genesis.toml" },
-                    "content": {
-                      "type": "object",
-                      "properties": {
-                        "sim.packages": {
-                          "type": "array",
-                          "items": {
-                            "type": "object",
-                            "properties": {
-                              "name": { "type": "string" },
-                              "description": { "type": "string" },
-                              "default_launch": { "type": "string" }
-                            }
-                          }
-                        }
-                      }
-                    }
-                  }
-                }
-              },
-              "required": ["output_path", "create_directories", "create_files", "symlink", "metadata"]
-            }
-          }
-        },
-        {
-          "type": "object",
-          "properties": {
-            "name": { "type": "string", "const": "genesis sim run" },
-            "description": { "type": "string", "const": "Runs a Gazebo simulation from a *_gazebo package." },
-            "arguments": {
-              "type": "object",
-              "properties": {
-                "package_name": {
-                  "type": "string",
-                  "pattern": "^[a-z0-9_]+_gazebo$"
-                },
-                "world": {
-                  "type": "string",
-                  "description": "Optional world file name (default: empty.world)."
-                },
-                "headless": {
-                  "type": "boolean",
-                  "description": "Run Gazebo in headless mode."
-                }
-              },
-              "required": ["package_name"]
-            },
-            "behavior": {
-              "type": "object",
-              "properties": {
-                "launch_file": { "type": "string", "const": "launch/<package_name>.launch.py" },
-                "no_temp_files": { "type": "boolean", "const": true },
-                "environment": {
-                  "type": "object",
-                  "properties": {
-                    "GAZEBO_MODEL_PATH": { "type": "string", "const": "sim/<package_name>/models" },
-                    "GAZEBO_WORLD_PATH": { "type": "string", "const": "sim/<package_name>/worlds" }
-                  }
-                }
-              },
-              "required": ["launch_file", "no_temp_files", "environment"]
-            }
-          }
-        }
-      ]
-    },
-    "template_directory": {
-      "type": "string",
-      "const": "templates/gazebo/",
-      "description": "Location of Jinja2 templates for generating files."
-    },
-    "template_files": {
-      "type": "array",
-      "items": {
-        "type": "object",
-        "properties": {
-          "path": { "type": "string" },
-          "content": { "type": "string" }
-        },
-        "required": ["path", "content"]
-      },
-      "enum": [
-        {
-          "path": "templates/gazebo/CMakeLists.txt.j2",
-          "content": "cmake_minimum_required(VERSION 3.8)\nproject({{ package_name }})\n\nfind_package(ament_cmake REQUIRED)\nfind_package(rclcpp REQUIRED)\nfind_package(gazebo_ros REQUIRED)\nfind_package({{ source_robot_package }} REQUIRED)\n\ninstall(DIRECTORY launch config worlds models urdf plugins\n  DESTINATION share/${PROJECT_NAME}/)\n\nament_package()"
-        },
-        {
-          "path": "templates/gazebo/package.xml.j2",
-          "content": "<?xml version=\"1.0\"?>\n<package format=\"3\">\n  <name>{{ package_name }}</name>\n  <version>0.1.0</version>\n  <description>Gazebo simulation for {{ source_robot_package }}</description>\n  <maintainer email=\"dev@yourcompany.com\">Your Team</maintainer>\n  <license>Apache-2.0</license>\n  <depend>rclcpp</depend>\n  <depend>gazebo_ros</depend>\n  <depend>{{ source_robot_package }}</depend>\n  <depend>xacro</depend>\n  <export>\n    <build_type>ament_cmake</build_type>\n  </export>\n</package>"
-        },
-        {
-          "path": "templates/gazebo/launch/main.launch.py.j2",
-          "content": "from launch import LaunchDescription\nfrom launch_ros.actions import Node\nfrom launch.actions import IncludeLaunchDescription\nfrom launch.launch_description_sources import PythonLaunchDescriptionSource\nimport os\n\ndef generate_launch_description():\n    pkg = get_package_share_directory('{{ package_name }}')\n    world = os.getenv('GAZEBO_WORLD', 'empty.world')\n    world_path = os.path.join(pkg, 'worlds', world)\n\n    return LaunchDescription([\n        Node(\n            package='gazebo_ros',\n            executable='gzserver',\n            arguments=[world_path],\n            output='screen'\n        ),\n        Node(\n            package='gazebo_ros',\n            executable='gzclient',\n            output='screen',\n            condition=UnlessCondition(os.getenv('HEADLESS', '0'))\n        ),\n        IncludeLaunchDescription(\n            PythonLaunchDescriptionSource(\n                os.path.join(pkg, 'launch', 'spawn_{{ robot_name }}.launch.py')\n            )\n        )\n    ])"
-        },
-        {
-          "path": "templates/gazebo/launch/spawn.launch.py.j2",
-          "content": "from launch import LaunchDescription\nfrom launch_ros.actions import Node\n\ndef generate_launch_description():\n    return LaunchDescription([\n        Node(\n            package='gazebo_ros',\n            executable='spawn_entity.py',\n            arguments=['-entity', '{{ robot_name }}', '-file', '{{ package_share_directory }}/{{ package_name }}/urdf/{{ robot_name }}.urdf.xacro'],\n            output='screen'\n        )\n    ])"
-        },
-        {
-          "path": "templates/gazebo/config/controllers.yaml.j2",
-          "content": "controller_manager:\n  ros__parameters:\n    update_rate: 100\n    joint_state_controller:\n      type: joint_state_controller/JointStateController\n"
-        },
-        {
-          "path": "templates/gazebo/worlds/empty.world",
-          "content": "<?xml version=\"1.0\" ?>\n<sdf version=\"1.6\">\n  <world name=\"empty\">\n    <include>\n      <uri>model://ground_plane</uri>\n    </include>\n    <include>\n      <uri>model://sun</uri>\n    </include>\n  </world>\n</sdf>"
-        }
-      ]
-    }
+[
+  {
+    "phase": 1,
+    "name": "Foundations",
+    "goal": "Establish the core configuration schema, CLI commands, and template directory structure within the Genesys repository, ensuring full alignment with Nav2 documentation standards for frames, topics, and basic setup.",
+    "detailed_implementation_steps": [
+      "Create or extend a YAML configuration file (e.g., config/navigation.yaml or a 'navigation' section in the main robot config) to store user inputs.",
+      "Define a strict schema based on Nav2 Setup Guides: required fields include robot_name (snake_case), drive_type (options: 'differential', 'omni', 'ackermann', 'skid_steer', 'legged'), simulation (boolean), geometry (length, width, height, wheel_base, wheel_radius in meters), sensors (lidar_2d, lidar_3d, depth_camera, rgb_camera, imu as booleans), odometry (fuse_imu boolean for robot_localization), params (environment: 'indoor'|'outdoor'|'mixed', max_linear_velocity, max_angular_velocity).",
+      "Standardize frames and topics per Nav2 docs: base_link as primary, odom frame for odometry, map frame for localization; default topics /scan for lidar, /imu/data for IMU, /odom for odometry message.",
+      "Extend the Genesys CLI (using Typer or Click) to add a 'nav2' command group.",
+      "Implement 'genesys nav2 init': interactive prompts using config defaults if file exists; validate inputs and write to config file.",
+      "Implement stubs for 'genesys nav2 generate' and 'genesys nav2 regen <section>' (sections: urdf, sensors, footprint, odom, params, launch).",
+      "Integrate with 'genesys new <robot>': add prompt 'Enable autonomous navigation with Nav2?' → if yes, run 'nav2 init'.",
+      "Create directory templates/navigation/ in the Genesys repo (parallel to existing templates). Subdirectories: urdf/, params/, launch/, sensors/. All templates must be .j2 Jinja files.",
+      "Add basic placeholder templates (e.g., empty base.xacro.j2, nav2_params.yaml.j2) to allow early testing.",
+      "Ensure no breaking changes to existing Genesys scaffolding.",
+      "Implement support for namespace argument: All generated launch files must accept a 'namespace' launch configuration (e.g., LaunchConfiguration('namespace')), and use push_ros_namespace or equivalent to prefix topics/TFs/parameters.",
+      "Enforce proper ROS 2 parameter structure in all YAML templates: Every node must be namespaced as <node_name>: ros__parameters: { ... }, with no top-level loose parameters."
+    ],
+    "guardrails": [
+      "All frame names must exactly match Nav2 conventions: base_link, odom, map, <sensor>_link (e.g., lidar_link).",
+      "Topics must follow Nav2 expectations: /scan (sensor_msgs/LaserScan), /odom (nav_msgs/Odometry), /tf and /tf_static.",
+      "Do not hardcode plugins yet; prepare for conditional selection in later phases.",
+      "Config values must be validated (e.g., positive dimensions, valid drive_type enum).",
+      "All launch files must support namespacing via a 'namespace' argument to enable multi-robot setups per Nav2 bringup examples.",
+      "Parameter YAML files must strictly use namespaced structure (<node_name>: ros__parameters:) as required by nav2_bringup and RewrittenYaml processing."
+    ]
   },
-  "required": ["cli_commands", "template_directory", "template_files"],
-  "additionalProperties": false
-}
+  {
+    "phase": 2,
+    "name": "Core Generation",
+    "goal": "Implement full template rendering and generation of a working Nav2 baseline robot, starting with differential drive + 2D lidar + simulation, strictly following official sam_bot examples and Nav2 plugin recommendations.",
+    "detailed_implementation_steps": [
+      "Create generators/navigation.py (or extend existing generator module) to load navigation config, render Jinja templates, and write to project packages (e.g., <robot>_description/urdf, <robot>_navigation/config, <robot>_simulation if simulation=true).",
+      "Implement URDF/Xacro generation: base chassis (box), caster + drive wheels, ros2_control with gazebo/plugins if simulation=true, diff_drive_controller for differential/omni.",
+      "Conditionally include sensor xacros (e.g., lidar_link with gazebo ray plugin publishing /scan).",
+      "Auto-compute footprint polygon with 0.05m safety padding per Nav2 footprint guide: points based on length/width.",
+      "Generate odometry setup: gazebo diff_drive plugin for sim; optional robot_localization ekf.yaml if fuse_imu=true and imu selected.",
+      "Generate nav2_params.yaml using nav2_bringup and sam_bot as base: costmaps (obstacle/inflation layers, voxel if depth), AMCL, BT navigator default tree.",
+      "Smart plugin selection per official Nav2 Plugins page and recommendations:",
+      "- Differential: planner 'SmacPlanner2D', controller 'RegulatedPurePursuit' or 'DWB' (prefer RegulatedPurePursuit for modern setups).",
+      "- Omni: planner 'SmacPlanner2D', controller 'MPPI'.",
+      "- Ackermann: planner 'SmacPlannerHybrid', controller 'RegulatedPurePursuit'.",
+      "- Use smoother plugin always.",
+      "Generate launch files: robot_state_publisher, nav2_bringup (navigation_launch.py customized), slam_toolbox online_async, gazebo spawn + world if simulation.",
+      "Create example genesys_nav_bot in repo examples/ using generated output (diff drive, 2D lidar, imu, sim=true) for verification.",
+      "Test: colcon build && launch simulation → RViz + Gazebo + basic navigation works.",
+      "Ensure identical footprint definition (same Jinja variable or computed value) is used in controller_server, local_costmap, and global_costmap (if polygon used).",
+      "Dynamically set obstacle_layer scan topics and expected frames based on active sensor config (e.g., only include /scan if lidar_2d=true).",
+      "Propagate use_sim_time consistently from config.simulation to all nodes in params and launch arguments."
+    ],
+    "guardrails": [
+      "Templates must mirror official navigation2_tutorials/sam_bot_description structure and params exactly where possible.",
+      "Plugin choices must follow current Nav2 recommendations (Smac planners preferred over Navfn; RegulatedPurePursuit/MPPI over older DWB for most cases).",
+      "Footprint must be polygon for local_costmap, radius fallback for global_costmap per docs.",
+      "All generated files must be valid ROS2 packages with proper CMakeLists/package.xml dependencies (nav2_bringup, robot_localization, slam_toolbox, gazebo_ros2_control).",
+      "Support real hardware path: no gazebo plugins if simulation=false.",
+      "Footprint parameters must be identical (same polygon points and radius) across controller_server, local_costmap.local_costmap, and global_costmap.global_costmap.",
+      "Costmap obstacle_layer topics and observation_sources must exactly match the sensors enabled in config (e.g., only /scan if lidar_2d=true; correct frame_id linking).",
+      "use_sim_time must be consistently set to the same value across all Nav2 nodes in params and passed as a launch argument defaulting to config.simulation."
+    ]
+  },
+  {
+    "phase": 3,
+    "name": "Polish & Validation",
+    "goal": "Add diagnostic and launch shortcut commands, plus thorough testing to ensure generated setups are robust and debuggable per Nav2 best practices.",
+    "detailed_implementation_steps": [
+      "Implement 'genesys nav2 doctor': use ros2 CLI to check required TFs (odom->base_link, map->odom if localized), topic publication (/scan, /odom, /tf), costmap updates, Nav2 node lifecycle states.",
+      "Output human-readable diagnostics with fixes suggestions (e.g., 'No /scan topic → check sensor config').",
+      "Implement 'genesys nav2 launch <mode>': shortcuts wrapping generated launch files (sim: gazebo + nav2 + rviz; slam: slam_toolbox + nav2; navigate: localization + nav2).",
+      "Add RViz config template with essential displays: RobotModel, TF, Map, LaserScan, Global/Local Costmap, Path.",
+      "Enhance testing: CI workflow to build and launch example robot, verify no errors, basic goal reachable in sim.",
+      "Documentation: update Genesys docs with Nav2 module usage examples, referencing official Nav2 docs for deeper tuning.",
+      "Extend doctor to verify TF chain direction (map → odom → base_link) and frequency (>10Hz for odom→base_link, stable map→odom)."
+    ],
+    "guardrails": [
+      "Doctor checks must cover all critical Nav2 requirements: continuous odom->base_link TF, sensor data on costmaps, lifecycle nodes active.",
+      "Launch shortcuts must use nav2_bringup patterns and allow map_server for pre-mapped localization.",
+      "All diagnostics must be non-destructive and use only ros2 CLI commands.",
+      "Doctor must verify correct TF transformation chain per REP-105: map → odom (localization broadcast), odom → base_link (odometry broadcast at high frequency), with no reverse or missing links."
+    ]
+  },
+  {
+    "phase": 4,
+    "name": "Advanced Features",
+    "goal": "Extend beyond MVP with optional high-value enhancements while maintaining strict compatibility with Nav2 ecosystem.",
+    "detailed_implementation_steps": [
+      "Optional: Auto-footprint from mesh – parse STL/DAE, project convex hull to 2D polygon.",
+      "Add tuning presets in config (e.g., 'aggressive_indoor', 'conservative_outdoor') modifying inflation, velocities, cost weights per Nav2 Tuning Guide.",
+      "Support advanced plugins conditionally (e.g., SmacLattice for custom kinematics).",
+      "Web UI wizard (if Genesys adds frontend): visual robot builder exporting to navigation.yaml.",
+      "Multi-profile support: multiple navigation configs per project.",
+      "Deeper Stark integration: wrap Nav2 BT navigator as Stark subsystem for agent composition.",
+      "Contribute back: if mature, propose example to navigation2_tutorials or share on ROS Discourse."
+    ],
+    "guardrails": [
+      "Advanced features must be optional and not break MVP setups.",
+      "Any auto-tuning must start from official Nav2 defaults and document deviations.",
+      "Remain compatible with latest Nav2 (Jazzy/Humble/Iron) and Gazebo Harmonic.",
+      "Prioritize features that reduce common pain points in Nav2 docs (e.g., footprint from model, plugin selection confusion)."
+    ]
+  }
+]

@@ -1,0 +1,112 @@
+{% set padding = 0.05 %} {# Safety margin per Nav2 footprint guide #}
+{% set length = config.navigation.geometry.length %}
+{% set width = config.navigation.geometry.width %}
+{% set footprint_points = [
+    [(length/2 + padding)|round(3), (width/2 + padding)|round(3)],
+    [(length/2 + padding)|round(3), -(width/2 + padding)|round(3)],
+    [-(length/2 + padding)|round(3), -(width/2 + padding)|round(3)],
+    [-(length/2 + padding)|round(3), (width/2 + padding)|round(3)]
+] %}
+{% set robot_radius = (([length, width]|max)/2 + 0.1)|round(3) %} {# Fallback inflation #}
+
+amcl:
+  ros__parameters:
+    use_sim_time: {{ config.navigation.simulation }}
+
+    alpha1: 0.2
+    alpha2: 0.2
+    alpha3: 0.2
+    alpha4: 0.2
+    alpha5: 0.2
+    base_frame_id: "base_link"
+    global_frame_id: "map"
+    odom_frame_id: "odom"
+    scan_topic: "/scan"
+    robot_model_type: "nav2_amcl::DifferentialMotionModel"  {# Specific to differential drive #}
+    transform_tolerance: 1.0
+    # ... (other AMCL defaults from sam_bot/nav2_bringup)
+
+bt_navigator:
+  ros__parameters:
+    use_sim_time: {{ config.navigation.simulation }}
+    global_frame: map
+    robot_base_frame: base_link
+    odom_topic: /odom
+    default_bt_xml_filename: "navigate_w_replanning_and_recovery.xml"  {# Or custom #}
+    # ... recoveries, etc.
+
+controller_server:
+  ros__parameters:
+    use_sim_time: {{ config.navigation.simulation }}
+
+    controller_frequency: 20.0
+    min_x_velocity_threshold: 0.001
+    min_theta_velocity_threshold: 0.001
+
+    FollowPath:
+      plugin: "nav2_regulated_pure_pursuit_controller::RegulatedPurePursuit"
+      desired_linear_vel: {{ config.navigation.params.max_linear_velocity }}
+      max_angular_vel: {{ config.navigation.params.max_angular_velocity }}
+      transform_tolerance: 0.1
+      regulate_curvature: true
+      # ... additional RPP params (lookahead_dist, etc.)
+
+    footprint: "{{ footprint_points }}"  {# Identical polygon #}
+    robot_radius: {{ robot_radius }}
+
+local_costmap:
+  local_costmap:
+    ros__parameters:
+      use_sim_time: {{ config.navigation.simulation }}
+      global_frame: odom
+      robot_base_frame: base_link
+      update_frequency: 5.0
+      publish_frequency: 2.0
+      rolling_window: true
+      width: 3
+      height: 3
+      resolution: 0.05
+      footprint: "{{ footprint_points }}"  {# Identical to controller #}
+      plugins: ["obstacle_layer", "inflation_layer"]
+      obstacle_layer:
+        plugin: "nav2_costmap_2d::ObstacleLayer"
+        observation_sources: scan
+        scan:
+          topic: /scan
+          max_obstacle_height: 2.0
+          clearing: true
+          marking: true
+          data_type: "LaserScan"
+      inflation_layer:
+        plugin: "nav2_costmap_2d::InflationLayer"
+        inflation_radius: 0.55
+        cost_scaling_factor: 3.0
+
+global_costmap:
+  global_costmap:
+    ros__parameters:
+      use_sim_time: {{ config.navigation.simulation }}
+      global_frame: map
+      robot_base_frame: base_link
+      update_frequency: 1.0
+      publish_frequency: 1.0
+      resolution: 0.05
+      robot_radius: {{ robot_radius }}  {# Fallback radius #}
+      plugins: ["static_layer", "obstacle_layer", "inflation_layer"]
+      # Similar obstacle_layer config as local
+      # ...
+
+planner_server:
+  ros__parameters:
+    use_sim_time: {{ config.navigation.simulation }}
+    planner_plugins: ["GridBased"]
+    GridBased:
+      plugin: "nav2_smac_planner/SmacPlanner2D"
+      tolerance: 0.3
+      downsample_costmap: false
+      allow_unknown: true
+      max_iterations: 1000000
+      smoother:
+        plugin: "nav2_smoother::SimpleSmoother"
+
+# Additional nodes if needed (e.g., map_server, lifecycle_manager)
