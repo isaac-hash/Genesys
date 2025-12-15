@@ -2,6 +2,7 @@ import click
 import yaml
 from pathlib import Path
 from pydantic import ValidationError
+import os
 
 from genesys_cli.config.navigation_config import (
     NavigationConfig,

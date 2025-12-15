@@ -1,12 +1,14 @@
-Metadata-Version: 2.4
-Name: genesys_framework_cli
+Metadata-Version: 2.1
+Name: genesys-framework-cli
 Version: 0.1.5
 Summary: A developer-friendly, opinionated framework for ROS 2.
 Home-page: https://github.com/isaac-hash/Genesys.git
 Author: Chukwudulue Isaac
-Author-email: Chukwudulue Isaac <zikkychukwudulue@gmail.com>
+Author-email: zikkychukwudulue@gmail.com
+License: UNKNOWN
 Project-URL: Homepage, https://github.com/isaac-hash/Genesys.git
 Project-URL: Issues, https://github.com/isaac-hash/Genesys/issues
+Platform: UNKNOWN
 Classifier: Programming Language :: Python :: 3
 Classifier: License :: OSI Approved :: Apache Software License
 Classifier: Operating System :: OS Independent
@@ -14,12 +16,6 @@ Requires-Python: >=3.8
 Description-Content-Type: text/markdown
 License-File: LICENSE.txt
 License-File: NOTICE.txt
-Requires-Dist: click
-Requires-Dist: Jinja2
-Dynamic: author
-Dynamic: home-page
-Dynamic: license-file
-Dynamic: requires-python
 
 # Genesys: An Opinionated ROS 2 Framework
 
@@ -250,3 +246,5 @@ In addition to the ones above, Genesys introduces new decorators for advanced RO
   - `@parameter`: Defines a node parameter, automatically loading values from a YAML config file and injecting them.
 
 <!-- end list -->
+
+
