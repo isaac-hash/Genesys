@@ -5,6 +5,7 @@ README.md
 org.txt
 pyproject.toml
 setup.py
+examples/vision_pipeline/vision_pipeline.launch.py
 genesys/__init__.py
 genesys/decorators.py
 genesys/genesys.cmake
@@ -12,6 +13,8 @@ genesys/helpers.py
 genesys/node_base.py
 genesys/cmake/genesysConfig.cmake
 genesys/include/genesys/macros.hpp
+genesys/pipeline/generator.py
+genesys/pipeline/parser.py
 genesys/resource/genesys
 genesys_cli/__init__.py
 genesys_cli/main.py
@@ -35,3 +38,7 @@ genesys_framework_cli.egg-info/dependency_links.txt
 genesys_framework_cli.egg-info/entry_points.txt
 genesys_framework_cli.egg-info/requires.txt
 genesys_framework_cli.egg-info/top_level.txt
+tests/integration/test_launch_mixed.py
+tests/integration/test_pipeline_run.py
+tests/unit/test_codegen.py
+tests/unit/test_decorators.py

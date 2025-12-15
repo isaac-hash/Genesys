@@ -1,2 +1,6 @@
+dist
+docs
+examples
 genesys
 genesys_cli
+tests
