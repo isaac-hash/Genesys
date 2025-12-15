@@ -1,5 +1,5 @@
 from enum import Enum
-from typing import Optional
+from typing import Optional, Literal
 from pydantic import BaseModel, Field
 
 class DriveType(str, Enum):
@@ -37,11 +37,11 @@ class NavParams(BaseModel):
     max_angular_velocity: float = Field(1.0, gt=0, description="Maximum angular velocity in rad/s")
 
 class FrameDefaults(BaseModel):
-    base_link: str = Field("base_link", const=True)
-    odom: str = Field("odom", const=True)
-    map: str = Field("map", const=True)
-    scan_topic: str = Field("/scan", const=True)
-    imu_topic: str = Field("/imu/data", const=True)
+    base_link: Literal["base_link"] = "base_link"
+    odom: Literal["odom"] = "odom"
+    map: Literal["map"] = "map"
+    scan_topic: Literal["/scan"] = "/scan"
+    imu_topic: Literal["/imu/data"] = "/imu/data"
 
 class NavigationConfig(BaseModel):
     robot_name: str = Field(..., min_length=1, pattern=r"^[a-z][a-z0-9_]*$", description="Robot name in snake_case")
