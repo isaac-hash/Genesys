@@ -33,7 +33,11 @@ cli.add_command(topic)
 cli.add_command(service)
 cli.add_command(action)
 cli.add_command(param)
+cli.add_command(param)
 cli.add_command(rqt)
+
+from genesys_cli.commands.nav2 import nav2
+cli.add_command(nav2)
 
 if __name__ == '__main__':
     cli()

@@ -1,0 +1,38 @@
+<?xml version="1.0"?>
+<robot xmlns:xacro="http://ros.org/wiki/xacro">
+    <xacro:macro name="imu_sensor">
+        <link name="imu_link">
+            <visual>
+                <geometry>
+                    <box size="0.05 0.05 0.05"/>
+                </geometry>
+                <material name="blue">
+                    <color rgba="0.0 0.0 1.0 1.0"/>
+                </material>
+            </visual>
+        </link>
+
+        <joint name="imu_joint" type="fixed">
+            <parent link="base_link"/>
+            <child link="imu_link"/>
+            <origin xyz="0 0 0.15" rpy="0 0 0"/>
+        </joint>
+
+        {% if config.simulation %}
+        <gazebo reference="imu_link">
+            <sensor name="imu_sensor" type="imu">
+             <plugin filename="libgazebo_ros_imu_sensor.so" name="imu_plugin">
+                <ros>
+                  <namespace>/</namespace>
+                  <remapping>~/out:=imu/data</remapping>
+                </ros>
+                <initial_orientation_as_reference>false</initial_orientation_as_reference>
+              </plugin>
+              <always_on>true</always_on>
+              <update_rate>100</update_rate>
+              <visualize>true</visualize>
+            </sensor>
+        </gazebo>
+        {% endif %}
+    </xacro:macro>
+</robot>
