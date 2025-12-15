@@ -108,7 +108,7 @@ def init(output):
     with open(output_path, 'w') as f:
         # Dump using JSON-compatible dict and then to YAML for better readability if needed
         # Or directly dump pydantic model to dict
-        yaml.dump(config.dict(), f, default_flow_style=False)
+        yaml.dump(config.model_dump(mode='json'), f, default_flow_style=False)
     
     click.echo(f"Navigation configuration saved to {output_path}")
 
