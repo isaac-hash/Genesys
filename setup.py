@@ -20,6 +20,8 @@ setup(
     install_requires=[
         "click",
         "Jinja2",
+        "pydantic",
+        "PyYAML",
         'importlib-resources; python_version < "3.9"',
     ],
     classifiers=[

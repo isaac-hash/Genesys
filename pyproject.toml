@@ -18,7 +18,9 @@ classifiers = [
 ]
 dependencies = [
     "click",
-    "Jinja2"
+    "Jinja2",
+    "pydantic",
+    "PyYAML"
 ]
 
 [project.scripts]
