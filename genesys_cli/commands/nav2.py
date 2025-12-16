@@ -129,8 +129,9 @@ def generate(config):
         nav_config = NavigationConfig(**config_data)
         
         # Determine output root (workspace root, assumed to be CWD or parent of config)
-        # We'll generate relative to CWD for now, or assume CWD is workspace root
-        output_root = Path.cwd()
+        # We'll generate relative to CWD/src so packages are found by colcon
+        output_root = Path.cwd() / "src"
+        output_root.mkdir(parents=True, exist_ok=True)
         
         from genesys_cli.generators.navigation import generate_navigation_package
         generate_navigation_package(nav_config, output_root)
