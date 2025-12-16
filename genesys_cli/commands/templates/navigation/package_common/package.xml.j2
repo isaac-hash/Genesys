@@ -22,6 +22,8 @@
 
   {% if package_suffix == 'simulation' %}
   <exec_depend>gazebo_ros</exec_depend>
+  <exec_depend>{{ config.robot_name }}_description</exec_depend>
+  <exec_depend>{{ config.robot_name }}_navigation</exec_depend>
   {% endif %}
 
   <test_depend>ament_lint_auto</test_depend>
