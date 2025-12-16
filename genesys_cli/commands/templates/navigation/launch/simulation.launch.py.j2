@@ -2,34 +2,81 @@
 import os
 from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription, ExecuteProcess
+from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription, TimerAction
 from launch.launch_description_sources import PythonLaunchDescriptionSource
-from launch.substitutions import LaunchConfiguration
+from launch.substitutions import LaunchConfiguration, Command
 from launch_ros.actions import Node
 
 def generate_launch_description():
+    use_sim_time = LaunchConfiguration('use_sim_time')
+
     pkg_gazebo_ros = get_package_share_directory('gazebo_ros')
     pkg_description = get_package_share_directory('{{ config.robot_name }}_description')
+    pkg_navigation = get_package_share_directory('{{ config.robot_name }}_navigation')
+
+    xacro_file = os.path.join(pkg_description, 'urdf', 'base.xacro')
+    robot_description_content = Command(['xacro ', xacro_file])
 
     return LaunchDescription([
+        DeclareLaunchArgument(
+            'use_sim_time',
+            default_value='true',
+            description='Use simulation time'),
+
         DeclareLaunchArgument(
             'world',
             default_value=[os.path.join(pkg_description, 'worlds', 'empty.world'), ''],
             description='SDF world file'),
 
+        # 1. Robot State Publisher (publishes /robot_description)
+        Node(
+            package='robot_state_publisher',
+            executable='robot_state_publisher',
+            name='robot_state_publisher',
+            output='screen',
+            parameters=[{
+                'use_sim_time': use_sim_time,
+                'robot_description': robot_description_content
+            }]
+        ),
+
+        # 2. Gazebo
         IncludeLaunchDescription(
             PythonLaunchDescriptionSource(
                 os.path.join(pkg_gazebo_ros, 'launch', 'gazebo.launch.py')
             ),
+            launch_arguments={'world': LaunchConfiguration('world')}.items()
         ),
 
-        Node(
-            package='gazebo_ros',
-            executable='spawn_entity.py',
-            name='spawn_entity',
-            output='screen',
-            arguments=['-entity', '{{ config.robot_name }}', 
-                       '-topic', 'robot_description',
-                       '-x', '0.0', '-y', '0.0', '-z', '0.1']
+        # 3. Spawn Entity (after Gazebo starts and robot_description is available)
+        TimerAction(
+            period=3.0, # Allow Gazebo to start
+            actions=[
+                Node(
+                    package='gazebo_ros',
+                    executable='spawn_entity.py',
+                    name='spawn_entity',
+                    output='screen',
+                    arguments=['-entity', '{{ config.robot_name }}', 
+                               '-topic', 'robot_description',
+                               '-x', '0.0', '-y', '0.0', '-z', '0.1']
+                )
+            ]
         ),
+
+        # 4. Nav2 Bringup (after a delay to ensure Gazebo and robot are ready)
+        TimerAction(
+            period=6.0, # Allow spawn to complete
+            actions=[
+                IncludeLaunchDescription(
+                    PythonLaunchDescriptionSource(
+                        os.path.join(pkg_navigation, 'launch', 'bringup.launch.py')
+                    ),
+                    launch_arguments={
+                        'use_sim_time': 'true',
+                        'use_rsp': 'false' # RSP already started above
+                    }.items()
+                )
+            ]
+        )
     ])

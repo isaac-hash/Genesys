@@ -3,25 +3,21 @@ import os
 from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription, GroupAction
+from launch.conditions import IfCondition
 from launch.launch_description_sources import PythonLaunchDescriptionSource
-from launch.substitutions import LaunchConfiguration, PathJoinSubstitution
+from launch.substitutions import LaunchConfiguration, PathJoinSubstitution, PythonExpression
 from launch_ros.actions import PushRosNamespace, Node
 
 def generate_launch_description():
     # Arguments
     namespace = LaunchConfiguration('namespace')
     use_sim_time = LaunchConfiguration('use_sim_time')
+    use_rsp = LaunchConfiguration('use_rsp')
     
     # Packages
     pkg_nav2_bringup = get_package_share_directory('nav2_bringup')
     pkg_slam_toolbox = get_package_share_directory('slam_toolbox')
     
-    # Path to our own params
-    # Assuming this file sits in <robot_name>_navigation/launch/
-    # And params are in <robot_name>_navigation/config/
-    # In a real installed generic sense, we'd look up the package share.
-    # For generated code, we can assume relative or package lookup if installed.
-    # We will assume package lookup for robustness.
     pkg_share = get_package_share_directory('{{ config.robot_name }}_navigation')
     nav2_params_file = os.path.join(pkg_share, 'config', 'nav2_params.yaml')
 
@@ -41,16 +37,22 @@ def generate_launch_description():
             default_value=nav2_params_file,
             description='Full path to the ROS2 parameters file to use for all launched nodes'),
 
+        DeclareLaunchArgument(
+            'use_rsp',
+            default_value='true',
+            description='Whether to launch robot_state_publisher (set false if already running)'),
+
         # Group for namespacing
         GroupAction(
             actions=[
                 PushRosNamespace(namespace),
                 
-                # Robot State Publisher (URDF)
+                # Robot State Publisher (URDF) - conditionally included
                 IncludeLaunchDescription(
                     PythonLaunchDescriptionSource(os.path.join(
                         get_package_share_directory('{{ config.robot_name }}_description'), 'launch', 'rsp.launch.py')),
-                    launch_arguments={'use_sim_time': use_sim_time, 'namespace': namespace}.items()
+                    launch_arguments={'use_sim_time': use_sim_time}.items(),
+                    condition=IfCondition(use_rsp)
                 ),
 
                 # Nav2 Bringup
@@ -61,19 +63,17 @@ def generate_launch_description():
                         'params_file': LaunchConfiguration('params_file'),
                         'container_name': 'nav2_container',
                         'namespace': namespace,
-                        'use_composition': 'True', # Best practice
+                        'use_composition': 'True',
                         'autostart': 'True'
                     }.items()
                 ),
                 
-                # SLAM Toolbox (if desired, or map_server if map provided)
-                # For Phase 2 we default to SLAM for "core generation" to get up and running 
-                # or we could make it conditional. Sticking to SLAM for autonomy base.
+                # SLAM Toolbox
                 IncludeLaunchDescription(
                      PythonLaunchDescriptionSource(os.path.join(pkg_slam_toolbox, 'launch', 'online_async_launch.py')),
                      launch_arguments={
                          'use_sim_time': use_sim_time,
-                         'params_file': LaunchConfiguration('params_file') # Reuse same params if possible, or split
+                         'params_file': LaunchConfiguration('params_file')
                      }.items()
                 )
             ]

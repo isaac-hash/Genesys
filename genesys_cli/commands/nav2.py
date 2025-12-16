@@ -308,41 +308,9 @@ def launch(mode, config, map_file):
     
     if mode == 'sim':
         click.secho(f"Launching Simulation for {robot_name}...", fg="cyan")
-
-        # Setup commands
-        sim_cmd = f"ros2 launch {robot_name}_simulation simulation.launch.py"
-        nav_cmd = f"ros2 launch {robot_name}_navigation bringup.launch.py"
-        
-        click.secho("Starting Simulation (Gazebo)...", fg="green")
-        sim_proc = subprocess.Popen(sim_cmd, shell=True)
-        
-        # Wait a bit
-        import time
-        time.sleep(5)
-        
-        click.secho("Starting Nav2 Bringup...", fg="green")
-        
-        # We need to be careful: if sim dies immediately, we shouldn't launch nav.
-        if sim_proc.poll() is not None:
-             click.secho("Simulation process died unexpectedly. Aborting Nav2 launch.", fg="red")
-             return
-
-        # Replace current process with Nav2
-        try:
-            # We use subprocess.call instead of os.system so we can catch KeyboardInterrupt gracefully if needed
-            # But os.system is fine for blocking.
-            ret = os.system(nav_cmd)
-        except KeyboardInterrupt:
-            # Triggered if user hits Ctrl+C
-            pass
-        
-        # Cleanup
-        click.secho("Stopping Simulation...", fg="yellow")
-        sim_proc.terminate()
-        try:
-            sim_proc.wait(timeout=5)
-        except subprocess.TimeoutExpired:
-            sim_proc.kill()
+        # Unified launch file handles Gazebo, spawn, RSP, and Nav2 bringup
+        cmd = f"ros2 launch {robot_name}_simulation simulation.launch.py"
+        os.system(cmd)
         
     elif mode == 'slam':
         click.secho(f"Launching SLAM for {robot_name}...", fg="cyan")
