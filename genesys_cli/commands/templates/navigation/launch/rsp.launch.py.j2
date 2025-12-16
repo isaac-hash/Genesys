@@ -8,11 +8,23 @@ from launch_ros.actions import Node
 def generate_launch_description():
     use_sim_time = LaunchConfiguration('use_sim_time')
     
-    pkg_share = get_package_share_directory('{{ config.robot_name }}_description')
-    xacro_file = os.path.join(pkg_share, 'urdf', 'base.xacro')
+from launch.substitutions import LaunchConfiguration, Command, FindExecutable, PathJoinSubstitution
+
+def generate_launch_description():
+    use_sim_time = LaunchConfiguration('use_sim_time')
+
+    pkg_gazebo_ros = get_package_share_directory('gazebo_ros')
+    pkg_description = get_package_share_directory('{{ config.robot_name }}_description')
+    pkg_navigation = get_package_share_directory('{{ config.robot_name }}_navigation')
+
+    xacro_file = os.path.join(pkg_description, 'urdf', 'base.xacro')
     
-    # Process xacro to URDF
-    robot_description_content = Command(['xacro ', xacro_file])
+    # Robust xacro command generation
+    robot_description_content = Command([
+        PathJoinSubstitution([FindExecutable(name='xacro')]),
+        ' ',
+        xacro_file
+    ])
     
     return LaunchDescription([
         DeclareLaunchArgument(
