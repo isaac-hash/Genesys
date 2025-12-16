@@ -4,7 +4,7 @@ from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription, TimerAction
 from launch.launch_description_sources import PythonLaunchDescriptionSource
-from launch.substitutions import LaunchConfiguration, Command
+from launch.substitutions import LaunchConfiguration, Command, FindExecutable, PathJoinSubstitution
 from launch_ros.actions import Node
 
 def generate_launch_description():
@@ -15,7 +15,13 @@ def generate_launch_description():
     pkg_navigation = get_package_share_directory('{{ config.robot_name }}_navigation')
 
     xacro_file = os.path.join(pkg_description, 'urdf', 'base.xacro')
-    robot_description_content = Command(['xacro ', xacro_file])
+    
+    # Robust xacro command generation to fix "No link elements found"
+    robot_description_content = Command([
+        PathJoinSubstitution([FindExecutable(name='xacro')]),
+        ' ',
+        xacro_file
+    ])
 
     return LaunchDescription([
         DeclareLaunchArgument(
