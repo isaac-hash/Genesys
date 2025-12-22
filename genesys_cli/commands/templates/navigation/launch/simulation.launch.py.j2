@@ -1,27 +1,38 @@
-
 import os
 from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription, TimerAction
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import LaunchConfiguration, Command, FindExecutable, PathJoinSubstitution
+from launch_ros.substitutions import FindPackageShare
 from launch_ros.actions import Node
+from launch_ros.parameter_descriptions import ParameterValue
 
 def generate_launch_description():
+    
     use_sim_time = LaunchConfiguration('use_sim_time')
 
     pkg_gazebo_ros = get_package_share_directory('gazebo_ros')
     pkg_description = get_package_share_directory('{{ config.robot_name }}_description')
     pkg_navigation = get_package_share_directory('{{ config.robot_name }}_navigation')
 
-    xacro_file = os.path.join(pkg_description, 'urdf', 'base.xacro')
+    # xacro_file = os.path.join(pkg_description, 'urdf', 'base.xacro')
     
     # Robust xacro command generation to fix "No link elements found"
+        # Correct way to process xacro file
     robot_description_content = Command([
-        PathJoinSubstitution([FindExecutable(name='xacro')]),
+        FindExecutable(name='xacro'),
         ' ',
-        xacro_file
+        PathJoinSubstitution([
+            FindPackageShare('{{ config.robot_name }}_description'),
+            'urdf',
+            'base.xacro'
+        ])
     ])
+
+    robot_description = {
+        'robot_description': ParameterValue(robot_description_content, value_type=str)
+    }
 
     return LaunchDescription([
         DeclareLaunchArgument(
@@ -31,8 +42,13 @@ def generate_launch_description():
 
         DeclareLaunchArgument(
             'world',
-            default_value=[os.path.join(pkg_description, 'worlds', 'empty.world'), ''],
-            description='SDF world file'),
+            default_value=PathJoinSubstitution([
+                FindPackageShare('{{ config.robot_name }}_description'),
+                'worlds',
+                'empty.world'
+            ]),
+            description='Full path to world file to load'
+        ),
 
         # 1. Robot State Publisher (publishes /robot_description)
         Node(
@@ -40,10 +56,23 @@ def generate_launch_description():
             executable='robot_state_publisher',
             name='robot_state_publisher',
             output='screen',
-            parameters=[{
-                'use_sim_time': use_sim_time,
-                'robot_description': robot_description_content
-            }]
+            parameters=[
+                robot_description,
+                {'use_sim_time': use_sim_time} 
+            ]
+        ),
+
+        # RViz visualization
+        Node(
+            package='rviz2',
+            executable='rviz2',
+            name='rviz2',
+            output='screen',
+            arguments=['-d', os.path.join(
+                get_package_share_directory('{{ config.robot_name }}_simulation'),
+                'rviz',
+                'navigation.rviz'
+            ), '--ros-args', '-p', 'use_sim_time:=true']
         ),
 
         # 2. Gazebo
@@ -83,24 +112,11 @@ def generate_launch_description():
                         'use_rsp': 'false', # RSP already started above
                         'params_file': os.path.join(
                             get_package_share_directory('{{ config.robot_name }}_navigation'),
-                            'config', 'nav2_params.yaml'
+                            'config',
+                            'nav2_params.yaml'
                         )
                     }.items()
                 )
             ]
-        ),
-
-        # 5. RViz visualization (launched immediately)
-        Node(
-            package='rviz2',
-            executable='rviz2',
-            name='rviz2',
-            output='screen'
-           # arguments=['-d', os.path.join(
-           #     get_package_share_directory('{{ config.robot_name }}_simulation'),
-           #     'rviz',
-           #     'navigation.rviz'
-           # ), '--ros-args', '-p', 'use_sim_time:=true'],
-           
         )
     ])
