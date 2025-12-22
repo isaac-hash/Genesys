@@ -1,7 +1,7 @@
 import os
 from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
-from launch.substitutions import LaunchConfiguration, Command, FindExecutable
+from launch.substitutions import LaunchConfiguration, Command, FindExecutable, PathJoinSubstitution
 from launch.actions import DeclareLaunchArgument
 from launch_ros.actions import Node
 
@@ -11,20 +11,20 @@ def generate_launch_description():
     pkg_description = get_package_share_directory('{{ config.robot_name }}_description')
 
     xacro_file = os.path.join(pkg_description, 'urdf', 'base.xacro')
-
+    
     # Robust xacro command generation
     robot_description_content = Command([
-        FindExecutable(name='xacro'),
+        PathJoinSubstitution([FindExecutable(name='xacro')]),
         ' ',
         xacro_file
     ])
-
+    
     return LaunchDescription([
         DeclareLaunchArgument(
             'use_sim_time',
-            default_value='false',
+            default_value='{{ use_sim_time }}',
             description='Use sim time if true'),
-
+            
         Node(
             package='robot_state_publisher',
             executable='robot_state_publisher',

@@ -139,10 +139,38 @@
         <publish_odom_tf>true</publish_odom_tf>
         <publish_wheel_tf>true</publish_wheel_tf>
         <odometry_frame>odom</odometry_frame>
-        <robot_base_frame>base_link</robot_base_frame>
+        <robot_base_frame>base_footprint</robot_base_frame>
       </plugin>
     </gazebo>
     {% endif %}
 
   </xacro:macro>
+  <xacro:base_robot/>
+
+  <!-- Sensors: Conditionally include based on configuration -->
+  {%- if config.sensors.lidar_2d %}
+  <xacro:include filename="$(find {{config.robot_name}}_description)/urdf/sensors/lidar.xacro"/>
+  <xacro:lidar_sensor/>
+  {%- endif %}
+
+  {%- if config.sensors.imu %}
+  <xacro:include filename="$(find {{config.robot_name}}_description)/urdf/sensors/imu.xacro"/>
+  <xacro:imu_sensor/>
+  {%- endif %}
+
+  {%- if config.sensors.lidar_3d %}
+  <xacro:include filename="$(find {{config.robot_name}}_description)/urdf/sensors/lidar_3d.xacro"/>
+  <xacro:lidar_3d_sensor/>
+  {%- endif %}
+
+  {%- if config.sensors.depth_camera %}
+  <xacro:include filename="$(find {{config.robot_name}}_description)/urdf/sensors/depth_camera.xacro"/>
+  <xacro:depth_camera_sensor/>
+  {%- endif %}
+
+  {%- if config.sensors.rgb_camera %}
+  <xacro:include filename="$(find {{config.robot_name}}_description)/urdf/sensors/rgb_camera.xacro"/>
+  <xacro:rgb_camera_sensor/>
+  {%- endif %}
+
 </robot>
