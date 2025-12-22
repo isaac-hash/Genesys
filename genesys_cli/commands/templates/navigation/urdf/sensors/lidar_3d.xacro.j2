@@ -1,0 +1,64 @@
+<?xml version="1.0"?>
+<robot xmlns:xacro="http://ros.org/wiki/xacro">
+    <xacro:macro name="lidar_3d_sensor">
+        <link name="lidar_3d_link">
+            <visual>
+                <geometry>
+                    <cylinder radius="0.06" length="0.08"/>
+                </geometry>
+                <material name="dark_red">
+                    <color rgba="0.5 0.0 0.0 1.0"/>
+                </material>
+            </visual>
+        </link>
+
+        <joint name="lidar_3d_joint" type="fixed">
+            <parent link="base_link"/>
+            <child link="lidar_3d_link"/>
+            <origin xyz="0 0 0.25" rpy="0 0 0"/> <!-- Slightly higher than 2D lidar -->
+        </joint>
+
+        {% if config.simulation %}
+        <gazebo reference="lidar_3d_link">
+            <sensor name="lidar_3d" type="gpu_ray">
+                <always_on>true</always_on>
+                <visualize>true</visualize>
+                <update_rate>10</update_rate>
+                <ray>
+                    <scan>
+                        <horizontal>
+                            <samples>1800</samples>
+                            <resolution>1.000000</resolution>
+                            <min_angle>-3.14159</min_angle>
+                            <max_angle>3.14159</max_angle>
+                        </horizontal>
+                        <vertical>
+                            <samples>16</samples>
+                            <resolution>1.0</resolution>
+                            <min_angle>-0.261799</min_angle> <!-- -15 degrees -->
+                            <max_angle>0.261799</max_angle>  <!-- +15 degrees -->
+                        </vertical>
+                    </scan>
+                    <range>
+                        <min>0.3</min>
+                        <max>100.0</max>
+                        <resolution>0.01</resolution>
+                    </range>
+                    <noise>
+                        <type>gaussian</type>
+                        <mean>0.0</mean>
+                        <stddev>0.02</stddev>
+                    </noise>
+                </ray>
+                <plugin name="lidar_3d_controller" filename="libgazebo_ros_ray_sensor.so">
+                    <ros>
+                        <remapping>~/out:=points</remapping>
+                    </ros>
+                    <output_type>sensor_msgs/PointCloud2</output_type>
+                    <frame_name>lidar_3d_link</frame_name>
+                </plugin>
+            </sensor>
+        </gazebo>
+        {% endif %}
+    </xacro:macro>
+</robot>

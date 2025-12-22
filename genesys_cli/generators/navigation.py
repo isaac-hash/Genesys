@@ -98,6 +98,13 @@ def generate_navigation_package(config: NavigationConfig, output_root: Path):
         context
     )
     
+    # 2. slam_params.yaml
+    render_template(
+        template_dir / "params" / "slam_params.yaml.j2",
+        pkg_nav / "config" / "slam_params.yaml",
+        context
+    )
+    
     # 2. bringup.launch.py
     if (template_dir / "launch" / "bringup.launch.py.j2").exists():
         render_template(
@@ -130,12 +137,46 @@ def generate_navigation_package(config: NavigationConfig, output_root: Path):
             context
         )
     
-    # Sensors
+    # Sensors - Generate sensor xacro files based on config
+    sensors_dir = template_dir / "urdf" / "sensors"
+    
     if config.sensors.lidar_2d:
-        if (template_dir / "urdf" / "sensors" / "lidar.xacro.j2").exists():
-             render_template(
-                template_dir / "urdf" / "sensors" / "lidar.xacro.j2",
+        if (sensors_dir / "lidar.xacro.j2").exists():
+            render_template(
+                sensors_dir / "lidar.xacro.j2",
                 pkg_desc / "urdf" / "sensors" / "lidar.xacro",
+                context
+            )
+    
+    if config.sensors.imu:
+        if (sensors_dir / "imu.xacro.j2").exists():
+            render_template(
+                sensors_dir / "imu.xacro.j2",
+                pkg_desc / "urdf" / "sensors" / "imu.xacro",
+                context
+            )
+    
+    if config.sensors.lidar_3d:
+        if (sensors_dir / "lidar_3d.xacro.j2").exists():
+            render_template(
+                sensors_dir / "lidar_3d.xacro.j2",
+                pkg_desc / "urdf" / "sensors" / "lidar_3d.xacro",
+                context
+            )
+    
+    if config.sensors.depth_camera:
+        if (sensors_dir / "depth_camera.xacro.j2").exists():
+            render_template(
+                sensors_dir / "depth_camera.xacro.j2",
+                pkg_desc / "urdf" / "sensors" / "depth_camera.xacro",
+                context
+            )
+    
+    if config.sensors.rgb_camera:
+        if (sensors_dir / "rgb_camera.xacro.j2").exists():
+            render_template(
+                sensors_dir / "rgb_camera.xacro.j2",
+                pkg_desc / "urdf" / "sensors" / "rgb_camera.xacro",
                 context
             )
     
@@ -153,6 +194,14 @@ def generate_navigation_package(config: NavigationConfig, output_root: Path):
              render_template(
                 template_dir / "launch" / "simulation.launch.py.j2",
                 pkg_sim / "launch" / "simulation.launch.py",
+                context
+            )
+        
+        # RViz config
+        if (template_dir / "rviz" / "navigation.rviz.j2").exists():
+            render_template(
+                template_dir / "rviz" / "navigation.rviz.j2",
+                pkg_sim / "rviz" / "navigation.rviz",
                 context
             )
              

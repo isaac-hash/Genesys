@@ -1,21 +1,14 @@
 import os
 from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
-from launch.substitutions import LaunchConfiguration, Command
+from launch.substitutions import LaunchConfiguration, Command, FindExecutable, PathJoinSubstitution
 from launch.actions import DeclareLaunchArgument
 from launch_ros.actions import Node
 
 def generate_launch_description():
     use_sim_time = LaunchConfiguration('use_sim_time')
-    
-from launch.substitutions import LaunchConfiguration, Command, FindExecutable, PathJoinSubstitution
 
-def generate_launch_description():
-    use_sim_time = LaunchConfiguration('use_sim_time')
-
-    pkg_gazebo_ros = get_package_share_directory('gazebo_ros')
     pkg_description = get_package_share_directory('{{ config.robot_name }}_description')
-    pkg_navigation = get_package_share_directory('{{ config.robot_name }}_navigation')
 
     xacro_file = os.path.join(pkg_description, 'urdf', 'base.xacro')
     
@@ -29,7 +22,7 @@ def generate_launch_description():
     return LaunchDescription([
         DeclareLaunchArgument(
             'use_sim_time',
-            default_value='false',
+            default_value='{{ use_sim_time }}',
             description='Use sim time if true'),
             
         Node(

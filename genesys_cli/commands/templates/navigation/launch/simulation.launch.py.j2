@@ -80,9 +80,27 @@ def generate_launch_description():
                     ),
                     launch_arguments={
                         'use_sim_time': 'true',
-                        'use_rsp': 'false' # RSP already started above
+                        'use_rsp': 'false', # RSP already started above
+                        'params_file': os.path.join(
+                            get_package_share_directory('{{ config.robot_name }}_navigation'),
+                            'config', 'nav2_params.yaml'
+                        )
                     }.items()
                 )
             ]
+        ),
+
+        # 5. RViz visualization (launched immediately)
+        Node(
+            package='rviz2',
+            executable='rviz2',
+            name='rviz2',
+            output='screen'
+           # arguments=['-d', os.path.join(
+           #     get_package_share_directory('{{ config.robot_name }}_simulation'),
+           #     'rviz',
+           #     'navigation.rviz'
+           # ), '--ros-args', '-p', 'use_sim_time:=true'],
+           
         )
     ])
