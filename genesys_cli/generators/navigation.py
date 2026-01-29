@@ -142,7 +142,7 @@ def generate_navigation_package(config: NavigationConfig, output_root: Path):
     worlds_dir.mkdir(parents=True, exist_ok=True)
     
     # Copy world files
-    gazebo_worlds_dir = template_dir.parent.parent / "gazebo" / "worlds"
+    gazebo_worlds_dir = template_dir.parent / "gazebo" / "worlds"
     if (gazebo_worlds_dir / "nav2_test.world").exists():
         shutil.copy(gazebo_worlds_dir / "nav2_test.world", worlds_dir / "nav2_test.world")
     
