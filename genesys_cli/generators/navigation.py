@@ -33,14 +33,14 @@ def select_plugins(drive_type: DriveType) -> Dict[str, str]:
     """
     plugins = {
         "planner": "nav2_smac_planner/SmacPlanner2D",
-        "controller": "nav2_regulated_pure_pursuit_controller::RegulatedPurePursuit"
+        "controller": "nav2_regulated_pure_pursuit_controller::RegulatedPurePursuitController"
     }
 
     if drive_type == DriveType.OMNI:
         plugins["controller"] = "nav2_mppi_controller::MPPIController"
     elif drive_type == DriveType.ACKERMANN:
         plugins["planner"] = "nav2_smac_planner/SmacPlannerHybrid"
-        plugins["controller"] = "nav2_regulated_pure_pursuit_controller::RegulatedPurePursuit"
+        plugins["controller"] = "nav2_regulated_pure_pursuit_controller::RegulatedPurePursuitController"
     # Differential/SkidStore defaults to Smac2D + RegulatedPurePursuit (or DWB, but RPP is preferred modern default)
     
     return plugins
@@ -137,6 +137,18 @@ def generate_navigation_package(config: NavigationConfig, output_root: Path):
             context
         )
     
+    # 3. Worlds
+    worlds_dir = pkg_desc / "worlds"
+    worlds_dir.mkdir(parents=True, exist_ok=True)
+    
+    # Copy world files
+    gazebo_worlds_dir = template_dir.parent.parent / "gazebo" / "worlds"
+    if (gazebo_worlds_dir / "nav2_test.world").exists():
+        shutil.copy(gazebo_worlds_dir / "nav2_test.world", worlds_dir / "nav2_test.world")
+    
+    if (gazebo_worlds_dir / "empty.world").exists():
+        shutil.copy(gazebo_worlds_dir / "empty.world", worlds_dir / "empty.world")
+
     # Sensors - Generate sensor xacro files based on config
     sensors_dir = template_dir / "urdf" / "sensors"
     

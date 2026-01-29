@@ -13,8 +13,8 @@ def generate_launch_description():
     use_sim_time = LaunchConfiguration('use_sim_time')
 
     pkg_gazebo_ros = get_package_share_directory('gazebo_ros')
-    pkg_description = get_package_share_directory('{{ config.robot_name }}_description')
-    pkg_navigation = get_package_share_directory('{{ config.robot_name }}_navigation')
+    pkg_description = get_package_share_directory('reg_bot_description')
+    pkg_navigation = get_package_share_directory('reg_bot_navigation')
 
     # xacro_file = os.path.join(pkg_description, 'urdf', 'base.xacro')
     
@@ -24,7 +24,7 @@ def generate_launch_description():
         FindExecutable(name='xacro'),
         ' ',
         PathJoinSubstitution([
-            FindPackageShare('{{ config.robot_name }}_description'),
+            FindPackageShare('reg_bot_description'),
             'urdf',
             'base.xacro'
         ])
@@ -43,7 +43,7 @@ def generate_launch_description():
         DeclareLaunchArgument(
             'world',
             default_value=PathJoinSubstitution([
-                FindPackageShare('{{ config.robot_name }}_description'),
+                FindPackageShare('reg_bot_description'),
                 'worlds',
                 'nav2_test.world'
             ]),
@@ -69,7 +69,7 @@ def generate_launch_description():
             name='rviz2',
             output='screen',
             arguments=['-d', os.path.join(
-                get_package_share_directory('{{ config.robot_name }}_simulation'),
+                get_package_share_directory('reg_bot_simulation'),
                 'rviz',
                 'navigation.rviz'
             ), '--ros-args', '-p', 'use_sim_time:=true']
@@ -92,7 +92,7 @@ def generate_launch_description():
                     executable='spawn_entity.py',
                     name='spawn_entity',
                     output='screen',
-                    arguments=['-entity', '{{ config.robot_name }}', 
+                    arguments=['-entity', 'reg_bot', 
                                '-topic', 'robot_description',
                                '-x', '0.0', '-y', '0.0', '-z', '0.1']
                 )
@@ -111,7 +111,7 @@ def generate_launch_description():
                         'use_sim_time': 'true',
                         'use_rsp': 'false', # RSP already started above
                         'params_file': os.path.join(
-                            get_package_share_directory('{{ config.robot_name }}_navigation'),
+                            get_package_share_directory('reg_bot_navigation'),
                             'config',
                             'nav2_params.yaml'
                         )

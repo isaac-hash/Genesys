@@ -18,7 +18,7 @@ def generate_launch_description():
     pkg_nav2_bringup = get_package_share_directory('nav2_bringup')
     pkg_slam_toolbox = get_package_share_directory('slam_toolbox')
     
-    pkg_share = get_package_share_directory('{{ config.robot_name }}_navigation')
+    pkg_share = get_package_share_directory('reg_bot_navigation')
     nav2_params_file = os.path.join(pkg_share, 'config', 'nav2_params.yaml')
 
     return LaunchDescription([
@@ -29,7 +29,7 @@ def generate_launch_description():
             
         DeclareLaunchArgument(
             'use_sim_time',
-            default_value='{{ use_sim_time }}',
+            default_value='true',
             description='Use simulation (Gazebo) clock if true'),
 
         DeclareLaunchArgument(
@@ -50,7 +50,7 @@ def generate_launch_description():
                 # Robot State Publisher (URDF) - conditionally included
                 IncludeLaunchDescription(
                     PythonLaunchDescriptionSource(os.path.join(
-                        get_package_share_directory('{{ config.robot_name }}_description'), 'launch', 'rsp.launch.py')),
+                        get_package_share_directory('reg_bot_description'), 'launch', 'rsp.launch.py')),
                     launch_arguments={'use_sim_time': use_sim_time}.items(),
                     condition=IfCondition(use_rsp)
                 ),
@@ -61,7 +61,6 @@ def generate_launch_description():
                     launch_arguments={
                         'use_sim_time': use_sim_time,
                         'params_file': LaunchConfiguration('params_file'),
-                        'container_name': 'nav2_container',
                         'namespace': namespace,
                         'use_composition': 'False',
                         'autostart': 'True',

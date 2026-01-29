@@ -1,6 +1,6 @@
 bt_navigator:
   ros__parameters:
-    use_sim_time: {{ use_sim_time }}
+    use_sim_time: true
     global_frame: map
     robot_base_frame: base_link
     odom_topic: /odom
@@ -56,7 +56,7 @@ bt_navigator:
 
 controller_server:
   ros__parameters:
-    use_sim_time: {{ use_sim_time }}
+    use_sim_time: true
     controller_frequency: 20.0
     min_x_velocity_threshold: 0.001
     min_y_velocity_threshold: 0.5
@@ -78,8 +78,8 @@ controller_server:
       yaw_goal_tolerance: 0.25
 
     FollowPath:
-      plugin: "{{ controller_plugin }}"
-      desired_linear_vel: {{ config.params.max_linear_velocity }}
+      plugin: "nav2_regulated_pure_pursuit_controller::RegulatedPurePursuitController"
+      desired_linear_vel: 0.5
       lookahead_dist: 0.6
       min_lookahead_dist: 0.3
       max_lookahead_dist: 0.9
@@ -104,7 +104,7 @@ controller_server:
 local_costmap:
   local_costmap:
     ros__parameters:
-      use_sim_time: {{ use_sim_time }}
+      use_sim_time: true
       global_frame: odom
       robot_base_frame: base_link
       update_frequency: 5.0
@@ -113,7 +113,7 @@ local_costmap:
       width: 3
       height: 3
       resolution: 0.05
-      footprint: "{{ footprint }}"
+      robot_radius: 0.22
       plugins: ["voxel_layer", "inflation_layer"]
       voxel_layer:
         plugin: "nav2_costmap_2d::VoxelLayer"
@@ -144,13 +144,13 @@ local_costmap:
 global_costmap:
   global_costmap:
     ros__parameters:
-      use_sim_time: {{ use_sim_time }}
+      use_sim_time: true
       global_frame: map
       robot_base_frame: base_link
       update_frequency: 1.0
       publish_frequency: 1.0
       resolution: 0.05
-      footprint: "{{ footprint }}"
+      robot_radius: 0.22
       track_unknown_space: true
       plugins: ["static_layer", "obstacle_layer", "inflation_layer"]
       static_layer:
@@ -178,18 +178,18 @@ global_costmap:
 
 planner_server:
   ros__parameters:
-    use_sim_time: {{ use_sim_time }}
+    use_sim_time: true
     expected_planner_frequency: 20.0
     planner_plugins: ["GridBased"]
     GridBased:
-      plugin: "{{ planner_plugin }}"
+      plugin: "nav2_navfn_planner/NavfnPlanner"
       tolerance: 0.5
       use_astar: false
       allow_unknown: true
 
 smoother_server:
   ros__parameters:
-    use_sim_time: {{ use_sim_time }}
+    use_sim_time: true
     smoother_plugins: ["simple_smoother"]
     simple_smoother:
       plugin: "nav2_smoother::SimpleSmoother"
@@ -199,7 +199,7 @@ smoother_server:
 
 behavior_server:
   ros__parameters:
-    use_sim_time: {{ use_sim_time }}
+    use_sim_time: true
     costmap_topic: local_costmap/costmap_raw
     footprint_topic: local_costmap/published_footprint
     cycle_frequency: 10.0
@@ -224,7 +224,7 @@ behavior_server:
 
 waypoint_follower:
   ros__parameters:
-    use_sim_time: {{ use_sim_time }}
+    use_sim_time: true
     loop_rate: 20
     stop_on_failure: false
     waypoint_task_executor_plugin: "wait_at_waypoint"
@@ -235,12 +235,12 @@ waypoint_follower:
 
 velocity_smoother:
   ros__parameters:
-    use_sim_time: {{ use_sim_time }}
+    use_sim_time: true
     smoothing_frequency: 20.0
     scale_velocities: False
     feedback: "OPEN_LOOP"
-    max_velocity: [{{ config.params.max_linear_velocity }}, 0.0, {{ config.params.max_angular_velocity }}]
-    min_velocity: [-{{ config.params.max_linear_velocity }}, 0.0, -{{ config.params.max_angular_velocity }}]
+    max_velocity: [0.5, 0.0, 1.0]
+    min_velocity: [-0.5, 0.0, -1.0]
     max_accel: [2.5, 0.0, 3.2]
     max_decel: [-2.5, 0.0, -3.2]
     odom_topic: "odom"
