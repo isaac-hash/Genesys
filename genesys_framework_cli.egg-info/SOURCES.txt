@@ -22,6 +22,7 @@ genesys_cli/commands/build.py
 genesys_cli/commands/doctor.py
 genesys_cli/commands/launch.py
 genesys_cli/commands/make.py
+genesys_cli/commands/nav2.py
 genesys_cli/commands/new.py
 genesys_cli/commands/pipeline.py
 genesys_cli/commands/ros.py

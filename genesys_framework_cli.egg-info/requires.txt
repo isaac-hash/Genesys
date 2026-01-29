@@ -1,2 +1,7 @@
 Jinja2
+PyYAML
 click
+pydantic
+
+[:python_version < "3.9"]
+importlib-resources
