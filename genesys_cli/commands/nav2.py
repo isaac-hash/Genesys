@@ -43,11 +43,11 @@ def prompt_for_config() -> NavigationConfig:
     
     # Geometry
     click.echo("\nRobot Geometry (meters):")
-    length = click.prompt("Length", type=float)
-    width = click.prompt("Width", type=float)
-    height = click.prompt("Height", type=float)
-    wheel_base = click.prompt("Wheel Base", type=float)
-    wheel_radius = click.prompt("Wheel Radius", type=float)
+    length = click.prompt("Length", type=float, default=0.35)
+    width = click.prompt("Width", type=float, default=0.25)
+    height = click.prompt("Height", type=float, default=0.12)
+    wheel_base = click.prompt("Wheel Base", type=float, default=0.28)
+    wheel_radius = click.prompt("Wheel Radius", type=float, default=0.08)
     geometry = GeometryConfig(
         length=length, width=width, height=height, 
         wheel_base=wheel_base, wheel_radius=wheel_radius
